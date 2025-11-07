@@ -4,7 +4,7 @@ description = "A command-line DNS client"
 
 authors = ["Benjamin Sago <ogham@bsago.me>"]
 categories = ["command-line-utilities"]
-edition = "2018"
+edition = "2024"
 exclude = [
     "/completions/*", "/man/*", "/xtests/*",
     "/dog-screenshot.png", "/Justfile", "/README.md", "/.rustfmt.toml", "/.travis.yml",
@@ -13,12 +13,10 @@ homepage = "https://dns.lookup.dog/"
 license = "EUPL-1.2"
 version = "0.2.0-pre"
 
-
 [[bin]]
 name = "dog"
 path = "src/main.rs"
 doctest = false
-
 
 [workspace]
 members = [
@@ -26,17 +24,16 @@ members = [
   "dns-transport",
 ]
 
-
-# make dev builds faster by excluding debug symbols
-[profile.dev]
-debug = false
-
-# use LTO for smaller binaries (that take longer to build)
 [profile.release]
 lto = true
-overflow-checks = true
+codegen-units = 1
 panic = "abort"
+strip = true
+opt-level = 3
 
+[lints.rust]
+unsafe_code = "deny"
+unused_imports = "deny"
 
 [dependencies]
 
@@ -63,7 +60,7 @@ log = "0.4"
 ipconfig = { version = "0.2" }
 
 [build-dependencies]
-datetime = { version = "0.5.1", default_features = false }
+datetime = { version = "0.5.1", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "0.7"
