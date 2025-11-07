@@ -30,10 +30,10 @@ impl Wire for SSHFP {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let algorithm = c.read_u8()?;
-        trace!("Parsed algorithm -> {:?}", algorithm);
+        trace!("Parsed algorithm -> {algorithm:?}");
 
         let fingerprint_type = c.read_u8()?;
-        trace!("Parsed fingerprint type -> {:?}", fingerprint_type);
+        trace!("Parsed fingerprint type -> {fingerprint_type:?}");
 
         if stated_length <= 2 {
             let mandated_length = MandatedLength::AtLeast(3);
@@ -46,7 +46,7 @@ impl Wire for SSHFP {
         let fingerprint_length = stated_length - 1 - 1;
         let mut fingerprint = vec![0_u8; usize::from(fingerprint_length)];
         c.read_exact(&mut fingerprint)?;
-        trace!("Parsed fingerprint -> {:#x?}", fingerprint);
+        trace!("Parsed fingerprint -> {fingerprint:#x?}");
 
         Ok(Self {
             algorithm,
@@ -59,10 +59,13 @@ impl Wire for SSHFP {
 impl SSHFP {
     /// Returns the hexadecimal representation of the fingerprint.
     pub fn hex_fingerprint(&self) -> String {
+        use std::fmt::Write;
         self.fingerprint
             .iter()
-            .map(|byte| format!("{:02x}", byte))
-            .collect()
+            .fold(String::new(), |mut output, byte| {
+                let _ = write!(output, "{byte:02x}");
+                output
+            })
     }
 }
 

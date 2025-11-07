@@ -21,10 +21,7 @@ impl Wire for EUI48 {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         if stated_length != 6 {
-            warn!(
-                "Length is incorrect (record length {:?}, but should be six)",
-                stated_length
-            );
+            warn!("Length is incorrect (record length {stated_length:?}, but should be six)");
             let mandated_length = MandatedLength::Exactly(6);
             return Err(WireError::WrongRecordLength {
                 stated_length,
@@ -34,7 +31,7 @@ impl Wire for EUI48 {
 
         let mut octets = [0_u8; 6];
         c.read_exact(&mut octets)?;
-        trace!("Parsed 6-byte address -> {:#x?}", octets);
+        trace!("Parsed 6-byte address -> {octets:#x?}");
 
         Ok(Self { octets })
     }

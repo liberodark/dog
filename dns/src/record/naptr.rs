@@ -40,15 +40,15 @@ impl Wire for NAPTR {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let order = c.read_u16::<BigEndian>()?;
-        trace!("Parsed order -> {:?}", order);
+        trace!("Parsed order -> {order:?}");
 
         // preference
         let preference = c.read_u16::<BigEndian>()?;
-        trace!("Parsed preference -> {:?}", preference);
+        trace!("Parsed preference -> {preference:?}");
 
         // flags
         let flags_length = c.read_u8()?;
-        trace!("Parsed flags length -> {:?}", flags_length);
+        trace!("Parsed flags length -> {flags_length:?}");
 
         let mut flags = vec![0_u8; usize::from(flags_length)].into_boxed_slice();
         c.read_exact(&mut flags)?;
@@ -56,7 +56,7 @@ impl Wire for NAPTR {
 
         // service
         let service_length = c.read_u8()?;
-        trace!("Parsed service length -> {:?}", service_length);
+        trace!("Parsed service length -> {service_length:?}");
 
         let mut service = vec![0_u8; usize::from(service_length)].into_boxed_slice();
         c.read_exact(&mut service)?;
@@ -64,7 +64,7 @@ impl Wire for NAPTR {
 
         // regex
         let regex_length = c.read_u8()?;
-        trace!("Parsed regex length -> {:?}", regex_length);
+        trace!("Parsed regex length -> {regex_length:?}");
 
         let mut regex = vec![0_u8; usize::from(regex_length)].into_boxed_slice();
         c.read_exact(&mut regex)?;
@@ -72,7 +72,7 @@ impl Wire for NAPTR {
 
         // replacement
         let (replacement, replacement_length) = c.read_labels()?;
-        trace!("Parsed replacement -> {:?}", replacement);
+        trace!("Parsed replacement -> {replacement:?}");
 
         let length_after_labels = 2
             + 2

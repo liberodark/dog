@@ -88,10 +88,10 @@ impl OutputFormat {
                 for answer in all_answers {
                     match answer {
                         Answer::Standard { record, .. } => {
-                            println!("{}", tf.record_payload_summary(record))
+                            println!("{}", tf.record_payload_summary(record));
                         }
                         Answer::Pseudo { opt, .. } => {
-                            println!("{}", tf.pseudo_record_payload_summary(opt))
+                            println!("{}", tf.pseudo_record_payload_summary(&opt));
                         }
                     }
                 }
@@ -101,7 +101,7 @@ impl OutputFormat {
 
                 for response in responses {
                     let json = json! ({
-                        "queries": json_queries(response.queries),
+                        "queries": json_queries(&response.queries),
                         "answers": json_answers(response.answers),
                         "authorities": json_answers(response.authorities),
                         "additionals": json_answers(response.additionals),
@@ -119,13 +119,13 @@ impl OutputFormat {
                         },
                     });
 
-                    println!("{}", object);
+                    println!("{object}");
                 } else {
                     let object = json! ({
                         "responses": rs,
                     });
 
-                    println!("{}", object);
+                    println!("{object}");
                 }
             }
             Self::Text(uc, tf) => {
@@ -175,7 +175,7 @@ impl OutputFormat {
                     "error_message": error_message(error),
                 });
 
-                eprintln!("{}", object);
+                eprintln!("{object}");
             }
         }
     }
@@ -298,14 +298,15 @@ impl TextFormat {
                 format!("{} {} {}", uri.priority, uri.weight, Ascii(&uri.target))
             }
             Record::Other { bytes, .. } => {
-                format!("{:?}", bytes)
+                format!("{bytes:?}")
             }
         }
     }
 
     /// Formats a summary of an OPT pseudo-record. Pseudo-records have a different
     /// structure than standard ones.
-    pub fn pseudo_record_payload_summary(self, opt: OPT) -> String {
+    #[allow(clippy::unused_self)]
+    pub fn pseudo_record_payload_summary(self, opt: &OPT) -> String {
         format!(
             "{} {} {} {} {:?}",
             opt.udp_payload_size, opt.higher_bits, opt.edns0_version, opt.flags, opt.data
@@ -318,7 +319,7 @@ impl TextFormat {
         if self.format_durations {
             format_duration_hms(seconds)
         } else {
-            format!("{}", seconds)
+            format!("{seconds}")
         }
     }
 }
@@ -327,7 +328,7 @@ impl TextFormat {
 /// zero units.
 fn format_duration_hms(seconds: u32) -> String {
     if seconds < 60 {
-        format!("{}s", seconds)
+        format!("{seconds}s")
     } else if seconds < 60 * 60 {
         format!("{}m{:02}s", seconds / 60, seconds % 60)
     } else if seconds < 60 * 60 * 24 {
@@ -349,7 +350,7 @@ fn format_duration_hms(seconds: u32) -> String {
 }
 
 /// Serialises multiple DNS queries as a JSON value.
-fn json_queries(queries: Vec<Query>) -> JsonValue {
+fn json_queries(queries: &[Query]) -> JsonValue {
     let queries = queries
         .iter()
         .map(|q| {
@@ -467,7 +468,6 @@ fn json_record_name(record: &Record) -> JsonValue {
 }
 
 /// Serialises a received DNS record as a JSON value.
-
 /// Even though DNS doesn’t specify a character encoding, strings are still
 /// converted from UTF-8, because JSON specifies UTF-8.
 fn json_record_data(record: Record) -> JsonValue {
@@ -619,8 +619,8 @@ impl fmt::Display for Ascii<'_> {
         write!(f, "\"")?;
 
         for byte in self.0.iter().copied() {
-            if byte < 32 || byte >= 128 {
-                write!(f, "\\{}", byte)?;
+            if !(32..128).contains(&byte) {
+                write!(f, "\\{byte}")?;
             } else if byte == b'"' {
                 write!(f, "\\\"")?;
             } else if byte == b'\\' {
@@ -645,8 +645,8 @@ pub fn print_error_code(rcode: ErrorCode) {
         ErrorCode::NotImplemented => println!("Status: Not Implemented"),
         ErrorCode::QueryRefused => println!("Status: Query Refused"),
         ErrorCode::BadVersion => println!("Status: Bad Version"),
-        ErrorCode::Private(num) => println!("Status: Private Reason ({})", num),
-        ErrorCode::Other(num) => println!("Status: Other Failure ({})", num),
+        ErrorCode::Private(num) => println!("Status: Private Reason ({num})"),
+        ErrorCode::Other(num) => println!("Status: Other Failure ({num})"),
     }
 }
 
@@ -679,7 +679,7 @@ fn error_message(error: TransportError) -> String {
         TransportError::TlsHandshakeError(e) => e.to_string(),
         #[cfg(feature = "with_rustls")]
         TransportError::RustlsError(e) => e.to_string(),
-        #[cfg(any(feature = "with_rustls"))]
+        #[cfg(feature = "with_rustls")]
         TransportError::RustlsInvalidDnsNameError => "Invalid DNS name for rustls".to_string(),
         #[cfg(feature = "with_https")]
         TransportError::HttpError(e) => e.to_string(),
@@ -701,42 +701,34 @@ fn wire_error_message(error: WireError) -> String {
             stated_length,
             mandated_length: MandatedLength::Exactly(len),
         } => {
-            format!(
-                "Malformed packet: record length should be {}, got {}",
-                len, stated_length
-            )
+            format!("Malformed packet: record length should be {len}, got {stated_length}")
         }
         WireError::WrongRecordLength {
             stated_length,
             mandated_length: MandatedLength::AtLeast(len),
         } => {
-            format!(
-                "Malformed packet: record length should be at least {}, got {}",
-                len, stated_length
-            )
+            format!("Malformed packet: record length should be at least {len}, got {stated_length}")
         }
         WireError::WrongLabelLength {
             stated_length,
             length_after_labels,
         } => {
             format!(
-                "Malformed packet: length {} was specified, but read {} bytes",
-                stated_length, length_after_labels
+                "Malformed packet: length {stated_length} was specified, but read {length_after_labels} bytes"
             )
         }
         WireError::TooMuchRecursion(indices) => {
-            format!("Malformed packet: too much recursion: {:?}", indices)
+            format!("Malformed packet: too much recursion: {indices:?}")
         }
         WireError::OutOfBounds(index) => {
-            format!("Malformed packet: out of bounds ({})", index)
+            format!("Malformed packet: out of bounds ({index})")
         }
         WireError::WrongVersion {
             stated_version,
             maximum_supported_version,
         } => {
             format!(
-                "Malformed packet: record specifies version {}, expected up to {}",
-                stated_version, maximum_supported_version
+                "Malformed packet: record specifies version {stated_version}, expected up to {maximum_supported_version}"
             )
         }
     }

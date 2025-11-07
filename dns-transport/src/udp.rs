@@ -43,13 +43,13 @@ impl Transport for UdpTransport {
             self.addr
         );
         let written_len = socket.send(&bytes_to_send)?;
-        debug!("Wrote {} bytes", written_len);
+        debug!("Wrote {written_len} bytes");
 
         info!("Waiting to receive...");
         let mut buf = vec![0; 4096];
         let received_len = socket.recv(&mut buf)?;
 
-        info!("Received {} bytes of data", received_len);
+        info!("Received {received_len} bytes of data");
         let response = Response::from_bytes(&buf[..received_len])?;
         Ok(response)
     }

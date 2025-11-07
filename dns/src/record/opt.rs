@@ -61,23 +61,23 @@ impl OPT {
     /// Unlike the `Wire::read` function, this does not require a length.
     pub fn read(c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let udp_payload_size = c.read_u16::<BigEndian>()?; // replaces the class field
-        trace!("Parsed UDP payload size -> {:?}", udp_payload_size);
+        trace!("Parsed UDP payload size -> {udp_payload_size:?}");
 
         let higher_bits = c.read_u8()?; // replaces the ttl field...
-        trace!("Parsed higher bits -> {:#08b}", higher_bits);
+        trace!("Parsed higher bits -> {higher_bits:#08b}");
 
         let edns0_version = c.read_u8()?; // ...as does this...
-        trace!("Parsed EDNS(0) version -> {:?}", edns0_version);
+        trace!("Parsed EDNS(0) version -> {edns0_version:?}");
 
         let flags = c.read_u16::<BigEndian>()?; // ...as does this
-        trace!("Parsed flags -> {:#08b}", flags);
+        trace!("Parsed flags -> {flags:#08b}");
 
         let data_length = c.read_u16::<BigEndian>()?;
-        trace!("Parsed data length -> {:?}", data_length);
+        trace!("Parsed data length -> {data_length:?}");
 
         let mut data = vec![0_u8; usize::from(data_length)];
         c.read_exact(&mut data)?;
-        trace!("Parsed data -> {:#x?}", data);
+        trace!("Parsed data -> {data:#x?}");
 
         Ok(Self {
             udp_payload_size,
@@ -92,6 +92,10 @@ impl OPT {
     ///
     /// This is necessary for OPT records to be sent in the Additional section
     /// of requests.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the data length exceeds `u16::MAX`.
     pub fn to_bytes(&self) -> io::Result<Vec<u8>> {
         let mut bytes = Vec::with_capacity(32);
 

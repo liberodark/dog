@@ -22,15 +22,14 @@ impl Wire for NS {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let (nameserver, nameserver_length) = c.read_labels()?;
-        trace!("Parsed nameserver -> {:?}", nameserver);
+        trace!("Parsed nameserver -> {nameserver:?}");
 
         if stated_length == nameserver_length {
             trace!("Length is correct");
             Ok(Self { nameserver })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, nameserver length {:?}",
-                stated_length, nameserver_length
+                "Length is incorrect (stated length {stated_length:?}, nameserver length {nameserver_length:?}"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

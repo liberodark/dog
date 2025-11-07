@@ -47,7 +47,7 @@ impl Transport for TcpTransport {
             self.addr
         );
         let written_len = stream.write(&bytes_to_send)?;
-        debug!("Wrote {} bytes", written_len);
+        debug!("Wrote {written_len} bytes");
 
         let read_bytes = Self::length_prefixed_read(&mut stream)?;
         let response = Response::from_bytes(&read_bytes)?;
@@ -95,7 +95,7 @@ impl TcpTransport {
 
             read_len += second_read_len;
         } else {
-            info!("Received {} bytes of data", read_len);
+            info!("Received {read_len} bytes of data");
         }
 
         let total_len = u16::from_be_bytes([buf[0], buf[1]]);
@@ -104,15 +104,12 @@ impl TcpTransport {
             return Ok(buf[2..read_len].to_vec());
         }
 
-        debug!("We need to read {} bytes total", total_len);
+        debug!("We need to read {total_len} bytes total");
         let mut combined_buffer = buf[2..read_len].to_vec();
         while combined_buffer.len() < usize::from(total_len) {
             let mut extend_buf = [0; 4096];
             let extend_len = stream.read(&mut extend_buf[..])?;
-            info!(
-                "Received further {} bytes of data (of {})",
-                extend_len, total_len
-            );
+            info!("Received further {extend_len} bytes of data (of {total_len})");
 
             if read_len == 0 {
                 warn!("Read zero bytes!");

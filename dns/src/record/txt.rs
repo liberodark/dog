@@ -33,10 +33,7 @@ impl Wire for TXT {
             loop {
                 let next_length = c.read_u8()?;
                 total_length += u16::from(next_length) + 1;
-                trace!(
-                    "Parsed slice length -> {:?} (total so far {:?})",
-                    next_length, total_length
-                );
+                trace!("Parsed slice length -> {next_length:?} (total so far {total_length:?})");
 
                 for _ in 0..next_length {
                     buf.push(c.read_u8()?);
@@ -63,8 +60,7 @@ impl Wire for TXT {
             Ok(Self { messages })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, messages length {:?})",
-                stated_length, total_length
+                "Length is incorrect (stated length {stated_length:?}, messages length {total_length:?})"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

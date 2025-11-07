@@ -21,7 +21,7 @@ impl Request {
         bytes.write_u16::<BigEndian>(1)?; // query count
         bytes.write_u16::<BigEndian>(0)?; // answer count
         bytes.write_u16::<BigEndian>(0)?; // authority RR count
-        bytes.write_u16::<BigEndian>(if self.additional.is_some() { 1 } else { 0 })?; // additional RR count
+        bytes.write_u16::<BigEndian>(u16::from(self.additional.is_some()))?; // additional RR count
 
         bytes.write_labels(&self.query.qname)?;
         bytes.write_u16::<BigEndian>(self.query.qtype.type_number())?;
@@ -52,14 +52,14 @@ impl Response {
     /// Reads bytes off of the given slice, parsing them into a response.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, WireError> {
         info!("Parsing response");
-        trace!("Bytes -> {:?}", bytes);
+        trace!("Bytes -> {bytes:?}");
         let mut c = Cursor::new(bytes);
 
         let transaction_id = c.read_u16::<BigEndian>()?;
-        trace!("Read txid -> {:?}", transaction_id);
+        trace!("Read txid -> {transaction_id:?}");
 
         let flags = Flags::from_u16(c.read_u16::<BigEndian>()?);
-        trace!("Read flags -> {:#?}", flags);
+        trace!("Read flags -> {flags:#?}");
 
         let query_count = c.read_u16::<BigEndian>()?;
         let answer_count = c.read_u16::<BigEndian>()?;
@@ -73,31 +73,28 @@ impl Response {
         // arbitrarily large (9 seems about right).
 
         let mut queries = Vec::with_capacity(usize::from(query_count.min(9)));
-        debug!("Reading {}x query from response", query_count);
+        debug!("Reading {query_count}x query from response");
         for _ in 0..query_count {
             let (qname, _) = c.read_labels()?;
             queries.push(Query::from_bytes(qname, &mut c)?);
         }
 
         let mut answers = Vec::with_capacity(usize::from(answer_count.min(9)));
-        debug!("Reading {}x answer from response", answer_count);
+        debug!("Reading {answer_count}x answer from response");
         for _ in 0..answer_count {
             let (qname, _) = c.read_labels()?;
             answers.push(Answer::from_bytes(qname, &mut c)?);
         }
 
         let mut authorities = Vec::with_capacity(usize::from(authority_count.min(9)));
-        debug!("Reading {}x authority from response", authority_count);
+        debug!("Reading {authority_count}x authority from response");
         for _ in 0..authority_count {
             let (qname, _) = c.read_labels()?;
             authorities.push(Answer::from_bytes(qname, &mut c)?);
         }
 
         let mut additionals = Vec::with_capacity(usize::from(additional_count.min(9)));
-        debug!(
-            "Reading {}x additional answer from response",
-            additional_count
-        );
+        debug!("Reading {additional_count}x additional answer from response");
         for _ in 0..additional_count {
             let (qname, _) = c.read_labels()?;
             additionals.push(Answer::from_bytes(qname, &mut c)?);
@@ -119,18 +116,18 @@ impl Query {
     /// the given domain name.
     fn from_bytes(qname: Labels, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let qtype_number = c.read_u16::<BigEndian>()?;
-        trace!("Read qtype number -> {:?}", qtype_number);
+        trace!("Read qtype number -> {qtype_number:?}");
 
         let qtype = RecordType::from(qtype_number);
-        trace!("Found qtype -> {:?}", qtype);
+        trace!("Found qtype -> {qtype:?}");
 
         let qclass = QClass::from_u16(c.read_u16::<BigEndian>()?);
-        trace!("Read qclass -> {:?}", qtype);
+        trace!("Read qclass -> {qclass:?}");
 
         Ok(Self {
-            qtype,
-            qclass,
             qname,
+            qclass,
+            qtype,
         })
     }
 }
@@ -140,23 +137,23 @@ impl Answer {
     /// the given domain name.
     fn from_bytes(qname: Labels, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let qtype_number = c.read_u16::<BigEndian>()?;
-        trace!("Read qtype number -> {:?}", qtype_number);
+        trace!("Read qtype number -> {qtype_number:?}");
 
         if qtype_number == OPT::RR_TYPE {
             let opt = OPT::read(c)?;
             Ok(Self::Pseudo { qname, opt })
         } else {
             let qtype = RecordType::from(qtype_number);
-            trace!("Found qtype -> {:?}", qtype);
+            trace!("Found qtype -> {qtype:?}");
 
             let qclass = QClass::from_u16(c.read_u16::<BigEndian>()?);
-            trace!("Read qclass -> {:?}", qtype);
+            trace!("Read qclass -> {qclass:?}");
 
             let ttl = c.read_u32::<BigEndian>()?;
-            trace!("Read TTL -> {:?}", ttl);
+            trace!("Read TTL -> {ttl:?}");
 
             let record_length = c.read_u16::<BigEndian>()?;
-            trace!("Read record length -> {:?}", record_length);
+            trace!("Read record length -> {record_length:?}");
 
             let record = Record::from_bytes(qtype, record_length, c)?;
             Ok(Self::Standard {
@@ -316,7 +313,7 @@ impl Opcode {
         if bits == 0 {
             Self::Query
         } else {
-            assert!(bits <= 15, "bits {:#08b} out of range", bits);
+            assert!(bits <= 15, "bits {bits:#08b} out of range");
             Self::Other(bits)
         }
     }
@@ -450,7 +447,7 @@ pub enum MandatedLength {
 
 impl From<io::Error> for WireError {
     fn from(ioe: io::Error) -> Self {
-        error!("IO error -> {:?}", ioe);
+        error!("IO error -> {ioe:?}");
         Self::IO
     }
 }

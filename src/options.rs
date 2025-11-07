@@ -225,7 +225,7 @@ impl Inputs {
     fn load_free_args(&mut self, matches: getopts::Matches) -> Result<(), OptionsError> {
         for argument in matches.free {
             if let Some(nameserver) = argument.strip_prefix('@') {
-                trace!("Got nameserver -> {:?}", nameserver);
+                trace!("Got nameserver -> {nameserver:?}");
                 self.add_nameserver(nameserver);
             } else if is_constant_name(&argument) {
                 if argument.eq_ignore_ascii_case("OPT") {
@@ -299,9 +299,8 @@ impl Inputs {
 }
 
 fn is_constant_name(argument: &str) -> bool {
-    let first_char = match argument.chars().next() {
-        Some(c) => c,
-        None => return false,
+    let Some(first_char) = argument.chars().next() else {
+        return false;
     };
 
     if !first_char.is_ascii_alphabetic() {
@@ -342,7 +341,7 @@ fn parse_dec_or_hex(input: &str) -> Option<u16> {
         match u16::from_str_radix(hex_str, 16) {
             Ok(num) => Some(num),
             Err(e) => {
-                warn!("Error parsing hex number: {}", e);
+                warn!("Error parsing hex number: {e}");
                 None
             }
         }
@@ -350,7 +349,7 @@ fn parse_dec_or_hex(input: &str) -> Option<u16> {
         match input.parse() {
             Ok(num) => Some(num),
             Err(e) => {
-                warn!("Error parsing number: {}", e);
+                warn!("Error parsing number: {e}");
                 None
             }
         }
@@ -384,7 +383,7 @@ impl UseColours {
             "always" | "yes" => Self::Always,
             "never" | "no" => Self::Never,
             otherwise => {
-                warn!("Unknown colour setting {:?}", otherwise);
+                warn!("Unknown colour setting {otherwise:?}");
                 Self::Automatic
             }
         }
@@ -436,7 +435,7 @@ impl ProtocolTweaks {
                                 continue;
                             }
                             Err(e) => {
-                                warn!("Failed to parse buffer size: {}", e);
+                                warn!("Failed to parse buffer size: {e}");
                             }
                         }
                     }
@@ -497,12 +496,12 @@ pub enum OptionsError {
 impl fmt::Display for OptionsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidDomain(domain) => write!(f, "Invalid domain {:?}", domain),
-            Self::InvalidEDNS(edns) => write!(f, "Invalid EDNS setting {:?}", edns),
-            Self::InvalidQueryType(qt) => write!(f, "Invalid query type {:?}", qt),
-            Self::InvalidQueryClass(qc) => write!(f, "Invalid query class {:?}", qc),
-            Self::InvalidTxid(txid) => write!(f, "Invalid transaction ID {:?}", txid),
-            Self::InvalidTweak(tweak) => write!(f, "Invalid protocol tweak {:?}", tweak),
+            Self::InvalidDomain(domain) => write!(f, "Invalid domain {domain:?}"),
+            Self::InvalidEDNS(edns) => write!(f, "Invalid EDNS setting {edns:?}"),
+            Self::InvalidQueryType(qt) => write!(f, "Invalid query type {qt:?}"),
+            Self::InvalidQueryClass(qc) => write!(f, "Invalid query class {qc:?}"),
+            Self::InvalidTxid(txid) => write!(f, "Invalid transaction ID {txid:?}"),
+            Self::InvalidTweak(tweak) => write!(f, "Invalid protocol tweak {tweak:?}"),
             Self::QueryTypeOPT => write!(f, "OPT request is sent by default (see -Z flag)"),
             Self::MissingHttpsUrl => {
                 write!(f, "You must pass a URL as a nameserver when using --https")
@@ -533,7 +532,7 @@ mod test {
         fn unwrap(self) -> Options {
             match self {
                 Self::Ok(o) => o,
-                _ => panic!("{:?}", self),
+                _ => panic!("{self:?}"),
             }
         }
     }

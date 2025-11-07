@@ -33,16 +33,16 @@ impl Wire for SRV {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let priority = c.read_u16::<BigEndian>()?;
-        trace!("Parsed priority -> {:?}", priority);
+        trace!("Parsed priority -> {priority:?}");
 
         let weight = c.read_u16::<BigEndian>()?;
-        trace!("Parsed weight -> {:?}", weight);
+        trace!("Parsed weight -> {weight:?}");
 
         let port = c.read_u16::<BigEndian>()?;
-        trace!("Parsed port -> {:?}", port);
+        trace!("Parsed port -> {port:?}");
 
         let (target, target_length) = c.read_labels()?;
-        trace!("Parsed target -> {:?}", target);
+        trace!("Parsed target -> {target:?}");
 
         let length_after_labels = 3 * 2 + target_length;
         if stated_length == length_after_labels {
@@ -55,8 +55,7 @@ impl Wire for SRV {
             })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, fields plus target length {:?})",
-                stated_length, length_after_labels
+                "Length is incorrect (stated length {stated_length:?}, fields plus target length {length_after_labels:?})"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

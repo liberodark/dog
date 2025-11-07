@@ -29,15 +29,15 @@ impl Wire for CAA {
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         // flags
         let flags = c.read_u8()?;
-        trace!("Parsed flags -> {:#08b}", flags);
+        trace!("Parsed flags -> {flags:#08b}");
 
         let has_bit = |bit| flags & bit == bit;
         let critical = has_bit(0b_1000_0000);
-        trace!("Parsed critical flag -> {:?}", critical);
+        trace!("Parsed critical flag -> {critical:?}");
 
         // tag
         let tag_length = c.read_u8()?;
-        trace!("Parsed tag length -> {:?}", tag_length);
+        trace!("Parsed tag length -> {tag_length:?}");
 
         let mut tag = vec![0_u8; usize::from(tag_length)].into_boxed_slice();
         c.read_exact(&mut tag)?;
@@ -47,7 +47,7 @@ impl Wire for CAA {
         let remaining_length = stated_length
             .saturating_sub(u16::from(tag_length))
             .saturating_sub(2);
-        trace!("Remaining length -> {:?}", remaining_length);
+        trace!("Remaining length -> {remaining_length:?}");
 
         let mut value = vec![0_u8; usize::from(remaining_length)].into_boxed_slice();
         c.read_exact(&mut value)?;

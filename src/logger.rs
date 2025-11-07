@@ -6,10 +6,7 @@ use std::ffi::OsStr;
 /// Sets the internal logger, changing the log level based on the value of an
 /// environment variable.
 pub fn configure<T: AsRef<OsStr>>(ev: Option<T>) {
-    let ev = match ev {
-        Some(v) => v,
-        None => return,
-    };
+    let Some(ev) = ev else { return };
 
     let env_var = ev.as_ref();
     if env_var.is_empty() {
@@ -24,7 +21,7 @@ pub fn configure<T: AsRef<OsStr>>(ev: Option<T>) {
 
     let result = log::set_logger(GLOBAL_LOGGER);
     if let Err(e) = result {
-        eprintln!("Failed to initialise logger: {}", e);
+        eprintln!("Failed to initialise logger: {e}");
     }
 }
 

@@ -49,7 +49,7 @@ fn main() {
 
     match Options::getopts(env::args_os().skip(1)) {
         OptionsResult::Ok(options) => {
-            info!("Running with options -> {:#?}", options);
+            info!("Running with options -> {options:#?}");
             disabled_feature_check(&options);
             exit(run(options));
         }
@@ -91,12 +91,12 @@ fn main() {
         }
 
         OptionsResult::InvalidOptionsFormat(oe) => {
-            eprintln!("dog: Invalid options: {}", oe);
+            eprintln!("dog: Invalid options: {oe}");
             exit(exits::OPTIONS_ERROR);
         }
 
         OptionsResult::InvalidOptions(why) => {
-            eprintln!("dog: Invalid options: {}", why);
+            eprintln!("dog: Invalid options: {why}");
             exit(exits::OPTIONS_ERROR);
         }
     }
@@ -126,24 +126,21 @@ fn run(
     let local_host_hints = match hints::LocalHosts::load() {
         Ok(lh) => lh,
         Err(e) => {
-            warn!("Error loading local host hints: {}", e);
+            warn!("Error loading local host hints: {e}");
             hints::LocalHosts::default()
         }
     };
 
     for hostname_in_query in &requests.inputs.domains {
         if local_host_hints.contains(hostname_in_query) {
-            eprintln!(
-                "warning: domain '{}' also exists in hosts file",
-                hostname_in_query
-            );
+            eprintln!("warning: domain '{hostname_in_query}' also exists in hosts file");
         }
     }
 
     let request_tuples = match requests.generate() {
         Ok(rt) => rt,
         Err(e) => {
-            eprintln!("Unable to obtain resolver: {}", e);
+            eprintln!("Unable to obtain resolver: {e}");
             return exits::SYSTEM_ERROR;
         }
     };
@@ -196,7 +193,7 @@ fn disabled_feature_check(options: &Options) {
     use crate::connect::TransportType;
     use std::process::exit;
 
-    #[cfg(all(not(feature = "with_tls"), not(feature = "with_rustls_tls")))]
+    #[cfg(all(not(feature = "with_tls"), not(feature = "with_rustls")))]
     if options
         .requests
         .inputs
@@ -209,7 +206,7 @@ fn disabled_feature_check(options: &Options) {
         exit(exits::OPTIONS_ERROR);
     }
 
-    #[cfg(all(not(feature = "with_https"), not(feature = "with_rustls_https")))]
+    #[cfg(all(not(feature = "with_https"), not(feature = "with_rustls")))]
     if options
         .requests
         .inputs

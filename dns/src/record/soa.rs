@@ -47,25 +47,25 @@ impl Wire for SOA {
     #[allow(clippy::similar_names)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let (mname, mname_length) = c.read_labels()?;
-        trace!("Parsed mname -> {:?}", mname);
+        trace!("Parsed mname -> {mname:?}");
 
         let (rname, rname_length) = c.read_labels()?;
-        trace!("Parsed rname -> {:?}", rname);
+        trace!("Parsed rname -> {rname:?}");
 
         let serial = c.read_u32::<BigEndian>()?;
-        trace!("Parsed serial -> {:?}", serial);
+        trace!("Parsed serial -> {serial:?}");
 
         let refresh_interval = c.read_u32::<BigEndian>()?;
-        trace!("Parsed refresh interval -> {:?}", refresh_interval);
+        trace!("Parsed refresh interval -> {refresh_interval:?}");
 
         let retry_interval = c.read_u32::<BigEndian>()?;
-        trace!("Parsed retry interval -> {:?}", retry_interval);
+        trace!("Parsed retry interval -> {retry_interval:?}");
 
         let expire_limit = c.read_u32::<BigEndian>()?;
-        trace!("Parsed expire limit -> {:?}", expire_limit);
+        trace!("Parsed expire limit -> {expire_limit:?}");
 
         let minimum_ttl = c.read_u32::<BigEndian>()?;
-        trace!("Parsed minimum TTL -> {:?}", minimum_ttl);
+        trace!("Parsed minimum TTL -> {minimum_ttl:?}");
 
         let length_after_labels = 4 * 5 + mname_length + rname_length;
         if stated_length == length_after_labels {
@@ -81,8 +81,7 @@ impl Wire for SOA {
             })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, mname plus rname plus fields length {:?})",
-                stated_length, length_after_labels
+                "Length is incorrect (stated length {stated_length:?}, mname plus rname plus fields length {length_after_labels:?})"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

@@ -26,10 +26,10 @@ impl Wire for MX {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let preference = c.read_u16::<BigEndian>()?;
-        trace!("Parsed preference -> {:?}", preference);
+        trace!("Parsed preference -> {preference:?}");
 
         let (exchange, exchange_length) = c.read_labels()?;
-        trace!("Parsed exchange -> {:?}", exchange);
+        trace!("Parsed exchange -> {exchange:?}");
 
         let length_after_labels = 2 + exchange_length;
         if stated_length == length_after_labels {
@@ -40,8 +40,7 @@ impl Wire for MX {
             })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, preference plus exchange length {:?}",
-                stated_length, length_after_labels
+                "Length is incorrect (stated length {stated_length:?}, preference plus exchange length {length_after_labels:?})"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

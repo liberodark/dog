@@ -32,10 +32,10 @@ impl Wire for URI {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let priority = c.read_u16::<BigEndian>()?;
-        trace!("Parsed priority -> {:?}", priority);
+        trace!("Parsed priority -> {priority:?}");
 
         let weight = c.read_u16::<BigEndian>()?;
-        trace!("Parsed weight -> {:?}", weight);
+        trace!("Parsed weight -> {weight:?}");
 
         // The target must not be empty.
         if stated_length <= 4 {
@@ -49,7 +49,7 @@ impl Wire for URI {
         let remaining_length = stated_length - 4;
         let mut target = vec![0_u8; usize::from(remaining_length)].into_boxed_slice();
         c.read_exact(&mut target)?;
-        trace!("Parsed target -> {:?}", String::from_utf8_lossy(&target));
+        trace!("Parsed target -> {target:?}");
 
         Ok(Self {
             priority,

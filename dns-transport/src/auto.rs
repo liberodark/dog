@@ -22,7 +22,7 @@ impl AutoTransport {
 impl Transport for AutoTransport {
     fn send(&self, request: &Request) -> Result<Response, Error> {
         let udp_transport = UdpTransport::new(self.addr.clone());
-        let udp_response = udp_transport.send(&request)?;
+        let udp_response = udp_transport.send(request)?;
 
         if !udp_response.flags.truncated {
             return Ok(udp_response);
@@ -31,7 +31,7 @@ impl Transport for AutoTransport {
         debug!("Truncated flag set, so switching to TCP");
 
         let tcp_transport = TcpTransport::new(self.addr.clone());
-        let tcp_response = tcp_transport.send(&request)?;
+        let tcp_response = tcp_transport.send(request)?;
         Ok(tcp_response)
     }
 }

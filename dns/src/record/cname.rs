@@ -21,15 +21,14 @@ impl Wire for CNAME {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let (domain, domain_length) = c.read_labels()?;
-        trace!("Parsed domain -> {:?}", domain);
+        trace!("Parsed domain -> {domain:?}");
 
         if stated_length == domain_length {
             trace!("Length is correct");
             Ok(Self { domain })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, domain length {:?})",
-                stated_length, domain_length
+                "Length is incorrect (stated length {stated_length:?}, domain length {domain_length:?})"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

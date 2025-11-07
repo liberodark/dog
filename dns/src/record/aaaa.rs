@@ -22,10 +22,7 @@ impl Wire for AAAA {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         if stated_length != 16 {
-            warn!(
-                "Length is incorrect (stated length {:?}, but should be sixteen)",
-                stated_length
-            );
+            warn!("Length is incorrect (stated length {stated_length:?}, but should be sixteen)");
             let mandated_length = MandatedLength::Exactly(16);
             return Err(WireError::WrongRecordLength {
                 stated_length,
@@ -37,7 +34,7 @@ impl Wire for AAAA {
         c.read_exact(&mut buf)?;
 
         let address = Ipv6Addr::from(buf);
-        trace!("Parsed IPv6 address -> {:#x?}", address);
+        trace!("Parsed IPv6 address -> {address:#x?}");
 
         Ok(Self { address })
     }

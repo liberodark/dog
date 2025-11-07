@@ -47,9 +47,7 @@ impl LocalHosts {
     fn load_from_file(file: File) -> io::Result<Self> {
         use std::io::{BufRead, BufReader};
 
-        if cfg!(test) {
-            panic!("load_from_file() called from test code");
-        }
+        assert!(!cfg!(test), "load_from_file() called from test code");
 
         let reader = BufReader::new(file);
 
@@ -67,7 +65,7 @@ impl LocalHosts {
                         hostnames.insert(hn);
                     }
                     Err(e) => {
-                        warn!("Failed to encode local host hint {:?}: {}", hostname, e);
+                        warn!("Failed to encode local host hint {hostname:?}: {e}");
                     }
                 }
             }

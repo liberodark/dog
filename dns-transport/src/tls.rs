@@ -1,7 +1,6 @@
-#![cfg_attr(not(feature = "tls"), allow(unused))]
+#![cfg_attr(not(feature = "with_tls"), allow(unused))]
 
 use std::io::Write;
-use std::net::TcpStream;
 
 use log::*;
 
@@ -28,19 +27,19 @@ impl Transport for TlsTransport {
         info!("Opening TLS socket");
 
         let domain = self.sni_domain();
-        info!("Connecting using domain {:?}", domain);
+        info!("Connecting using domain {domain:?}");
         let mut stream = if self.addr.contains(':') {
-            let mut parts = self.addr.split(":");
+            let mut parts = self.addr.split(':');
             let domain = parts.nth(0).unwrap();
             let port = parts
-                .last()
+                .next_back()
                 .unwrap()
                 .parse::<u16>()
                 .expect("Invalid port number");
 
             Self::stream(domain, port)?
         } else {
-            Self::stream(&*self.addr, 853)?
+            Self::stream(&self.addr, 853)?
         };
 
         debug!("Connected");

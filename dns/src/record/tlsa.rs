@@ -33,13 +33,13 @@ impl Wire for TLSA {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let certificate_usage = c.read_u8()?;
-        trace!("Parsed certificate_usage -> {:?}", certificate_usage);
+        trace!("Parsed certificate_usage -> {certificate_usage:?}");
 
         let selector = c.read_u8()?;
-        trace!("Parsed selector -> {:?}", selector);
+        trace!("Parsed selector -> {selector:?}");
 
         let matching_type = c.read_u8()?;
-        trace!("Parsed matching type -> {:?}", matching_type);
+        trace!("Parsed matching type -> {matching_type:?}");
 
         if stated_length <= 3 {
             let mandated_length = MandatedLength::AtLeast(4);
@@ -52,7 +52,7 @@ impl Wire for TLSA {
         let certificate_data_length = stated_length - 1 - 1 - 1;
         let mut certificate_data = vec![0_u8; usize::from(certificate_data_length)];
         c.read_exact(&mut certificate_data)?;
-        trace!("Parsed fingerprint -> {:#x?}", certificate_data);
+        trace!("Parsed fingerprint -> {certificate_data:#x?}");
 
         Ok(Self {
             certificate_usage,
@@ -66,10 +66,13 @@ impl Wire for TLSA {
 impl TLSA {
     /// Returns the hexadecimal representation of the fingerprint.
     pub fn hex_certificate_data(&self) -> String {
+        use std::fmt::Write;
         self.certificate_data
             .iter()
-            .map(|byte| format!("{:02x}", byte))
-            .collect()
+            .fold(String::new(), |mut output, byte| {
+                let _ = write!(output, "{byte:02x}");
+                output
+            })
     }
 }
 

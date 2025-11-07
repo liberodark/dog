@@ -38,8 +38,8 @@ impl From<u16> for UnknownQtype {
 impl fmt::Display for UnknownQtype {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::HeardOf(name, _) => write!(f, "{}", name),
-            Self::UnheardOf(num) => write!(f, "{}", num),
+            Self::HeardOf(name, _) => write!(f, "{name}"),
+            Self::UnheardOf(num) => write!(f, "{num}"),
         }
     }
 }

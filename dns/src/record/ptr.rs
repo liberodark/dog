@@ -27,15 +27,14 @@ impl Wire for PTR {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let (cname, cname_length) = c.read_labels()?;
-        trace!("Parsed cname -> {:?}", cname);
+        trace!("Parsed cname -> {cname:?}");
 
         if stated_length == cname_length {
             trace!("Length is correct");
             Ok(Self { cname })
         } else {
             warn!(
-                "Length is incorrect (stated length {:?}, cname length {:?}",
-                stated_length, cname_length
+                "Length is incorrect (stated length {stated_length:?}, cname length {cname_length:?}"
             );
             Err(WireError::WrongLabelLength {
                 stated_length,

@@ -3,13 +3,7 @@
 
 [dog](https://dns.lookup.dog/) is a command-line DNS client.
 
-<a href="https://travis-ci.org/github/ogham/dog">
-    <img src="https://travis-ci.org/ogham/dog.svg?branch=master" alt="Build status" />
-</a>
-
-<a href="https://saythanks.io/to/ogham%40bsago.me">
-    <img src="https://img.shields.io/badge/Say%20Thanks-!-1EAEDB.svg" alt="Say thanks!" />
-</a>
+[![Rust](https://github.com/liberodark/dog/actions/workflows/rust.yml/badge.svg)](https://github.com/liberodark/dog/actions/workflows/rust.yml)
 </div>
 
 ![A screenshot of dog making a DNS request](dog-screenshot.png)

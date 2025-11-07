@@ -78,7 +78,7 @@ impl Wire for LOC {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let version = c.read_u8()?;
-        trace!("Parsed version -> {:?}", version);
+        trace!("Parsed version -> {version:?}");
 
         if version != 0 {
             return Err(WireError::WrongVersion {
@@ -97,25 +97,25 @@ impl Wire for LOC {
 
         let size_bits = c.read_u8()?;
         let size = Size::from_u8(size_bits);
-        trace!("Parsed size -> {:#08b} ({})", size_bits, size);
+        trace!("Parsed size -> {size_bits:#08b} ({size})");
 
         let horizontal_precision = c.read_u8()?;
-        trace!("Parsed horizontal precision -> {:?}", horizontal_precision);
+        trace!("Parsed horizontal precision -> {horizontal_precision:?}");
 
         let vertical_precision = c.read_u8()?;
-        trace!("Parsed vertical precision -> {:?}", vertical_precision);
+        trace!("Parsed vertical precision -> {vertical_precision:?}");
 
         let latitude_num = c.read_u32::<BigEndian>()?;
         let latitude = Position::from_u32(latitude_num, true);
-        trace!("Parsed latitude -> {:?} ({:?})", latitude_num, latitude);
+        trace!("Parsed latitude -> {latitude_num:?} ({latitude:?})");
 
         let longitude_num = c.read_u32::<BigEndian>()?;
         let longitude = Position::from_u32(longitude_num, false);
-        trace!("Parsed longitude -> {:?} ({:?})", longitude_num, longitude);
+        trace!("Parsed longitude -> {longitude_num:?} ({longitude:?})");
 
         let altitude_num = c.read_u32::<BigEndian>()?;
         let altitude = Altitude::from_u32(altitude_num);
-        trace!("Parsed altitude -> {:?} ({:})", altitude_num, altitude);
+        trace!("Parsed altitude -> {altitude_num:?} ({altitude})");
 
         Ok(Self {
             size,

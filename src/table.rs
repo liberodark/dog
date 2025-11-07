@@ -65,14 +65,14 @@ impl Table {
                     qtype,
                     qname,
                     ttl,
-                    summary,
                     section,
+                    summary,
                 });
             }
             Answer::Pseudo { qname, opt } => {
                 let qtype = "OPT".style(self.colours.opt).to_string();
                 let qname = qname.to_string();
-                let summary = self.text_format.pseudo_record_payload_summary(opt);
+                let summary = self.text_format.pseudo_record_payload_summary(&opt);
                 self.rows.push(Row {
                     qtype,
                     qname,
@@ -107,7 +107,7 @@ impl Table {
                         print!(" ");
                     }
 
-                    print!("{}", ttl);
+                    print!("{ttl}");
                 } else {
                     for _ in 0..ttl_len {
                         print!(" ");

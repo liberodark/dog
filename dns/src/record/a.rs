@@ -22,10 +22,7 @@ impl Wire for A {
 
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         if stated_length != 4 {
-            warn!(
-                "Length is incorrect (record length {:?}, but should be four)",
-                stated_length
-            );
+            warn!("Length is incorrect (record length {stated_length:?}, but should be four)");
             let mandated_length = MandatedLength::Exactly(4);
             return Err(WireError::WrongRecordLength {
                 stated_length,
@@ -37,7 +34,7 @@ impl Wire for A {
         c.read_exact(&mut buf)?;
 
         let address = Ipv4Addr::from(buf);
-        trace!("Parsed IPv4 address -> {:?}", address);
+        trace!("Parsed IPv4 address -> {address:?}");
 
         Ok(Self { address })
     }

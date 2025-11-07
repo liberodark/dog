@@ -1,7 +1,6 @@
-#![cfg_attr(not(feature = "https"), allow(unused))]
+#![cfg_attr(not(feature = "with_https"), allow(unused))]
 
 use std::io::{Read, Write};
-use std::net::TcpStream;
 
 use log::*;
 
@@ -37,12 +36,12 @@ fn contains_header(buf: &[u8]) -> bool {
 use tls_stream::TlsStream;
 
 impl Transport for HttpsTransport {
-    #[cfg(any(feature = "with_https"))]
+    #[cfg(feature = "with_https")]
     fn send(&self, request: &Request) -> Result<Response, Error> {
         let (domain, path) = self.split_domain().expect("Invalid HTTPS nameserver");
 
-        info!("Opening TLS socket to {:?}", domain);
-        let mut stream = Self::stream(&domain, 443)?;
+        info!("Opening TLS socket to {domain:?}");
+        let mut stream = Self::stream(domain, 443)?;
 
         debug!("Connected");
 
@@ -81,7 +80,7 @@ impl Transport for HttpsTransport {
             read_len += stream.read(&mut buf[read_len..])?;
         }
         let mut expected_len = read_len;
-        info!("Received {} bytes of data", read_len);
+        info!("Received {read_len} bytes of data");
 
         let mut headers = [httparse::EMPTY_HEADER; 16];
         let mut response = httparse::Response::new(&mut headers);
@@ -110,7 +109,7 @@ impl Transport for HttpsTransport {
 
         let body = &buf[index..read_len];
         debug!("HTTP body has {} bytes", body.len());
-        let response = Response::from_bytes(&body)?;
+        let response = Response::from_bytes(body)?;
         Ok(response)
     }
 
@@ -122,10 +121,10 @@ impl Transport for HttpsTransport {
 
 impl HttpsTransport {
     fn split_domain(&self) -> Option<(&str, &str)> {
-        if let Some(sp) = self.url.strip_prefix("https://") {
-            if let Some(colon_index) = sp.find('/') {
-                return Some((&sp[..colon_index], &sp[colon_index..]));
-            }
+        if let Some(sp) = self.url.strip_prefix("https://")
+            && let Some(colon_index) = sp.find('/')
+        {
+            return Some((&sp[..colon_index], &sp[colon_index..]));
         }
 
         None
