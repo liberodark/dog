@@ -177,7 +177,6 @@ impl Record {
         len: u16,
         c: &mut Cursor<&[u8]>,
     ) -> Result<Self, WireError> {
-
         macro_rules! read_record {
             ($record:tt) => {{
                 info!(

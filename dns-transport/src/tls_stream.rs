@@ -14,18 +14,21 @@ fn stream_nativetls(domain: &str, port: u16) -> Result<native_tls::TlsStream<Tcp
 fn stream_rustls(
     domain: &str,
     port: u16,
-) -> Result<rustls::StreamOwned<rustls::ClientSession, TcpStream>, Error> {
+) -> Result<rustls::StreamOwned<rustls::ClientConnection, TcpStream>, Error> {
+    use rustls::pki_types::ServerName;
     use std::sync::Arc;
 
-    let mut config = rustls::ClientConfig::new();
+    let root_store =
+        rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
-    config
-        .root_store
-        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+    let config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
 
-    let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain)?;
+    let server_name =
+        ServerName::try_from(domain.to_owned()).map_err(|_| Error::RustlsInvalidDnsNameError)?;
 
-    let conn = rustls::ClientSession::new(&Arc::new(config), dns_name);
+    let conn = rustls::ClientConnection::new(Arc::new(config), server_name)?;
 
     let sock = TcpStream::connect((domain, port))?;
     let tls = rustls::StreamOwned::new(conn, sock);
@@ -55,14 +58,14 @@ cfg_if::cfg_if! {
 
     } else if #[cfg(feature = "with_rustls")] {
 
-        impl TlsStream<rustls::StreamOwned<rustls::ClientSession,TcpStream>> for HttpsTransport {
-            fn stream(domain: &str, port: u16) -> Result<rustls::StreamOwned<rustls::ClientSession,TcpStream>, Error> {
+        impl TlsStream<rustls::StreamOwned<rustls::ClientConnection, TcpStream>> for HttpsTransport {
+            fn stream(domain: &str, port: u16) -> Result<rustls::StreamOwned<rustls::ClientConnection, TcpStream>, Error> {
                 stream_rustls(domain, port)
             }
         }
 
-        impl TlsStream<rustls::StreamOwned<rustls::ClientSession,TcpStream>> for TlsTransport {
-            fn stream(domain: &str, port: u16) -> Result<rustls::StreamOwned<rustls::ClientSession,TcpStream>, Error> {
+        impl TlsStream<rustls::StreamOwned<rustls::ClientConnection, TcpStream>> for TlsTransport {
+            fn stream(domain: &str, port: u16) -> Result<rustls::StreamOwned<rustls::ClientConnection, TcpStream>, Error> {
                 stream_rustls(domain, port)
             }
         }

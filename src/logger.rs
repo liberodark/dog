@@ -1,8 +1,7 @@
 //! Debug error logging.
 
+use owo_colors::OwoColorize;
 use std::ffi::OsStr;
-
-use ansi_term::{ANSIString, Colour};
 
 /// Sets the internal logger, changing the log level based on the value of an
 /// environment variable.
@@ -36,13 +35,13 @@ const GLOBAL_LOGGER: &Logger = &Logger;
 
 impl log::Log for Logger {
     fn enabled(&self, _: &log::Metadata<'_>) -> bool {
-        true // no need to filter after using ‘set_max_level’.
+        true // no need to filter after using 'set_max_level'.
     }
 
     fn log(&self, record: &log::Record<'_>) {
-        let open = Colour::Fixed(243).paint("[");
+        let open = "[".truecolor(150, 150, 150); // Fixed 243 approximation
         let level = level(record.level());
-        let close = Colour::Fixed(243).paint("]");
+        let close = "]".truecolor(150, 150, 150);
 
         eprintln!(
             "{}{} {}{} {}",
@@ -55,16 +54,16 @@ impl log::Log for Logger {
     }
 
     fn flush(&self) {
-        // no need to flush with ‘eprintln!’.
+        // no need to flush with 'eprintln!'.
     }
 }
 
-fn level(level: log::Level) -> ANSIString<'static> {
+fn level(level: log::Level) -> String {
     match level {
-        log::Level::Error => Colour::Red.paint("ERROR"),
-        log::Level::Warn => Colour::Yellow.paint("WARN"),
-        log::Level::Info => Colour::Cyan.paint("INFO"),
-        log::Level::Debug => Colour::Blue.paint("DEBUG"),
-        log::Level::Trace => Colour::Fixed(245).paint("TRACE"),
+        log::Level::Error => "ERROR".red().to_string(),
+        log::Level::Warn => "WARN".yellow().to_string(),
+        log::Level::Info => "INFO".cyan().to_string(),
+        log::Level::Debug => "DEBUG".blue().to_string(),
+        log::Level::Trace => "TRACE".truecolor(180, 180, 180).to_string(), // Fixed 245 approximation
     }
 }

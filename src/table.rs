@@ -1,11 +1,9 @@
 //! Rendering tables of DNS response results.
 
-use std::time::Duration;
-
-use ansi_term::ANSIString;
-
 use dns::Answer;
 use dns::record::Record;
+use owo_colors::OwoColorize;
+use std::time::Duration;
 
 use crate::colours::Colours;
 use crate::output::TextFormat;
@@ -22,7 +20,7 @@ pub struct Table {
 /// A row of the table. This contains all the fields
 #[derive(Debug)]
 pub struct Row {
-    qtype: ANSIString<'static>,
+    qtype: String,
     qname: String,
     ttl: Option<String>,
     section: Section,
@@ -72,7 +70,7 @@ impl Table {
                 });
             }
             Answer::Pseudo { qname, opt } => {
-                let qtype = self.colours.opt.paint("OPT");
+                let qtype = "OPT".style(self.colours.opt).to_string();
                 let qname = qname.to_string();
                 let summary = self.text_format.pseudo_record_payload_summary(opt);
                 self.rows.push(Row {
@@ -98,7 +96,7 @@ impl Table {
                     print!(" ");
                 }
 
-                print!("{} {} ", r.qtype, self.colours.qname.paint(&r.qname));
+                print!("{} {} ", r.qtype, r.qname.style(self.colours.qname));
 
                 for _ in 0..qname_len - r.qname.len() {
                     print!(" ");
@@ -125,31 +123,34 @@ impl Table {
         }
     }
 
-    fn coloured_record_type(&self, record: &Record) -> ANSIString<'static> {
+    fn coloured_record_type(&self, record: &Record) -> String {
         match *record {
-            Record::A(_) => self.colours.a.paint("A"),
-            Record::AAAA(_) => self.colours.aaaa.paint("AAAA"),
-            Record::CAA(_) => self.colours.caa.paint("CAA"),
-            Record::CNAME(_) => self.colours.cname.paint("CNAME"),
-            Record::EUI48(_) => self.colours.eui48.paint("EUI48"),
-            Record::EUI64(_) => self.colours.eui64.paint("EUI64"),
-            Record::HINFO(_) => self.colours.hinfo.paint("HINFO"),
-            Record::LOC(_) => self.colours.loc.paint("LOC"),
-            Record::MX(_) => self.colours.mx.paint("MX"),
-            Record::NAPTR(_) => self.colours.ns.paint("NAPTR"),
-            Record::NS(_) => self.colours.ns.paint("NS"),
-            Record::OPENPGPKEY(_) => self.colours.openpgpkey.paint("OPENPGPKEY"),
-            Record::PTR(_) => self.colours.ptr.paint("PTR"),
-            Record::SSHFP(_) => self.colours.sshfp.paint("SSHFP"),
-            Record::SOA(_) => self.colours.soa.paint("SOA"),
-            Record::SRV(_) => self.colours.srv.paint("SRV"),
-            Record::TLSA(_) => self.colours.tlsa.paint("TLSA"),
-            Record::TXT(_) => self.colours.txt.paint("TXT"),
-            Record::URI(_) => self.colours.uri.paint("URI"),
+            Record::A(_) => "A".style(self.colours.a).to_string(),
+            Record::AAAA(_) => "AAAA".style(self.colours.aaaa).to_string(),
+            Record::CAA(_) => "CAA".style(self.colours.caa).to_string(),
+            Record::CNAME(_) => "CNAME".style(self.colours.cname).to_string(),
+            Record::EUI48(_) => "EUI48".style(self.colours.eui48).to_string(),
+            Record::EUI64(_) => "EUI64".style(self.colours.eui64).to_string(),
+            Record::HINFO(_) => "HINFO".style(self.colours.hinfo).to_string(),
+            Record::LOC(_) => "LOC".style(self.colours.loc).to_string(),
+            Record::MX(_) => "MX".style(self.colours.mx).to_string(),
+            Record::NAPTR(_) => "NAPTR".style(self.colours.naptr).to_string(),
+            Record::NS(_) => "NS".style(self.colours.ns).to_string(),
+            Record::OPENPGPKEY(_) => "OPENPGPKEY".style(self.colours.openpgpkey).to_string(),
+            Record::PTR(_) => "PTR".style(self.colours.ptr).to_string(),
+            Record::SSHFP(_) => "SSHFP".style(self.colours.sshfp).to_string(),
+            Record::SOA(_) => "SOA".style(self.colours.soa).to_string(),
+            Record::SRV(_) => "SRV".style(self.colours.srv).to_string(),
+            Record::TLSA(_) => "TLSA".style(self.colours.tlsa).to_string(),
+            Record::TXT(_) => "TXT".style(self.colours.txt).to_string(),
+            Record::URI(_) => "URI".style(self.colours.uri).to_string(),
 
             Record::Other {
                 ref type_number, ..
-            } => self.colours.unknown.paint(type_number.to_string()),
+            } => type_number
+                .to_string()
+                .style(self.colours.unknown)
+                .to_string(),
         }
     }
 
@@ -169,11 +170,11 @@ impl Table {
             .unwrap()
     }
 
-    fn format_section(&self, section: Section) -> ANSIString<'static> {
+    fn format_section(&self, section: Section) -> String {
         match section {
-            Section::Answer => self.colours.answer.paint(" "),
-            Section::Authority => self.colours.authority.paint("A"),
-            Section::Additional => self.colours.additional.paint("+"),
+            Section::Answer => " ".style(self.colours.answer).to_string(),
+            Section::Authority => "A".style(self.colours.authority).to_string(),
+            Section::Additional => "+".style(self.colours.additional).to_string(),
         }
     }
 }

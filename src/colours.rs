@@ -1,7 +1,6 @@
 //! Colours, colour schemes, and terminal styling.
 
-use ansi_term::Color::*;
-use ansi_term::Style;
+use owo_colors::Style;
 
 /// The **colours** are used to paint the input.
 #[derive(Debug, Default)]
@@ -40,33 +39,33 @@ impl Colours {
     /// defined. This is used by default.
     pub fn pretty() -> Self {
         Self {
-            qname: Blue.bold(),
+            qname: Style::new().blue().bold(),
 
-            answer: Style::default(),
-            authority: Cyan.normal(),
-            additional: Green.normal(),
+            answer: Style::new(),
+            authority: Style::new().cyan(),
+            additional: Style::new().green(),
 
-            a: Green.bold(),
-            aaaa: Green.bold(),
-            caa: Red.normal(),
-            cname: Yellow.normal(),
-            eui48: Yellow.normal(),
-            eui64: Yellow.bold(),
-            hinfo: Yellow.normal(),
-            loc: Yellow.normal(),
-            mx: Cyan.normal(),
-            naptr: Green.normal(),
-            ns: Red.normal(),
-            openpgpkey: Cyan.normal(),
-            opt: Purple.normal(),
-            ptr: Red.normal(),
-            sshfp: Cyan.normal(),
-            soa: Purple.normal(),
-            srv: Cyan.normal(),
-            tlsa: Yellow.normal(),
-            txt: Yellow.normal(),
-            uri: Yellow.normal(),
-            unknown: White.on(Red),
+            a: Style::new().green().bold(),
+            aaaa: Style::new().green().bold(),
+            caa: Style::new().red(),
+            cname: Style::new().yellow(),
+            eui48: Style::new().yellow(),
+            eui64: Style::new().yellow().bold(),
+            hinfo: Style::new().yellow(),
+            loc: Style::new().yellow(),
+            mx: Style::new().cyan(),
+            naptr: Style::new().green(),
+            ns: Style::new().red(),
+            openpgpkey: Style::new().cyan(),
+            opt: Style::new().purple(),
+            ptr: Style::new().red(),
+            sshfp: Style::new().cyan(),
+            soa: Style::new().purple(),
+            srv: Style::new().cyan(),
+            tlsa: Style::new().yellow(),
+            txt: Style::new().yellow(),
+            uri: Style::new().yellow(),
+            unknown: Style::new().white().on_red(),
         }
     }
 

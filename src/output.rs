@@ -7,7 +7,9 @@ use std::time::Duration;
 use dns::record::{OPT, Record, RecordType, UnknownQtype};
 use dns::{Answer, ErrorCode, MandatedLength, QClass, Query, Response, WireError};
 use dns_transport::Error as TransportError;
-use json::{JsonValue, object};
+use is_terminal::IsTerminal;
+use serde_json::{Value as JsonValue, json};
+use std::io;
 
 use crate::colours::Colours;
 use crate::table::{Section, Table};
@@ -51,9 +53,7 @@ impl UseColours {
     /// terminal.
     pub fn should_use_colours(self) -> bool {
         self == Self::Always
-            || (atty::is(atty::Stream::Stdout)
-                && env::var("NO_COLOR").is_err()
-                && self != Self::Never)
+            || (io::stdout().is_terminal() && env::var("NO_COLOR").is_err() && self != Self::Never)
     }
 
     /// Creates a palette of colours depending on the user’s wishes or whether
@@ -100,30 +100,30 @@ impl OutputFormat {
                 let mut rs = Vec::new();
 
                 for response in responses {
-                    let json = object! {
+                    let json = json! ({
                         "queries": json_queries(response.queries),
                         "answers": json_answers(response.answers),
                         "authorities": json_answers(response.authorities),
                         "additionals": json_answers(response.additionals),
-                    };
+                    });
 
                     rs.push(json);
                 }
 
                 if let Some(duration) = duration {
-                    let object = object! {
+                    let object = json! ({
                         "responses": rs,
                         "duration": {
                             "secs": duration.as_secs(),
                             "millis": duration.subsec_millis(),
                         },
-                    };
+                    });
 
                     println!("{}", object);
                 } else {
-                    let object = object! {
+                    let object = json! ({
                         "responses": rs,
-                    };
+                    });
 
                     println!("{}", object);
                 }
@@ -169,11 +169,11 @@ impl OutputFormat {
             }
 
             Self::JSON => {
-                let object = object! {
+                let object = json! ({
                     "error": true,
                     "error_phase": erroneous_phase(&error),
                     "error_message": error_message(error),
-                };
+                });
 
                 eprintln!("{}", object);
             }
@@ -353,11 +353,11 @@ fn json_queries(queries: Vec<Query>) -> JsonValue {
     let queries = queries
         .iter()
         .map(|q| {
-            object! {
+            json! ({
                 "name": q.qname.to_string(),
                 "class": json_class(q.qclass),
                 "type": json_record_type_name(q.qtype),
-            }
+            })
         })
         .collect::<Vec<_>>();
 
@@ -375,23 +375,23 @@ fn json_answers(answers: Vec<Answer>) -> JsonValue {
                 ttl,
                 record,
             } => {
-                object! {
+                json! ({
                     "name": qname.to_string(),
                     "class": json_class(qclass),
                     "ttl": ttl,
                     "type": json_record_name(&record),
                     "data": json_record_data(record),
-                }
+                })
             }
             Answer::Pseudo { qname, opt } => {
-                object! {
+                json! ({
                     "name": qname.to_string(),
                     "type": "OPT",
                     "data": {
                         "version": opt.edns0_version,
                         "data": opt.data,
                     },
-                }
+                })
             }
         })
         .collect::<Vec<_>>();
@@ -473,45 +473,45 @@ fn json_record_name(record: &Record) -> JsonValue {
 fn json_record_data(record: Record) -> JsonValue {
     match record {
         Record::A(a) => {
-            object! {
+            json! ({
                 "address": a.address.to_string(),
-            }
+            })
         }
         Record::AAAA(aaaa) => {
-            object! {
+            json! ({
                 "address": aaaa.address.to_string(),
-            }
+            })
         }
         Record::CAA(caa) => {
-            object! {
+            json! ({
                 "critical": caa.critical,
                 "tag": String::from_utf8_lossy(&caa.tag).to_string(),
                 "value": String::from_utf8_lossy(&caa.value).to_string(),
-            }
+            })
         }
         Record::CNAME(cname) => {
-            object! {
+            json! ({
                 "domain": cname.domain.to_string(),
-            }
+            })
         }
         Record::EUI48(eui48) => {
-            object! {
+            json! ({
                 "identifier": eui48.formatted_address(),
-            }
+            })
         }
         Record::EUI64(eui64) => {
-            object! {
+            json! ({
                 "identifier": eui64.formatted_address(),
-            }
+            })
         }
         Record::HINFO(hinfo) => {
-            object! {
+            json! ({
                 "cpu": String::from_utf8_lossy(&hinfo.cpu).to_string(),
                 "os": String::from_utf8_lossy(&hinfo.os).to_string(),
-            }
+            })
         }
         Record::LOC(loc) => {
-            object! {
+            json! ({
                 "size": loc.size.to_string(),
                 "precision": {
                     "horizontal": loc.horizontal_precision,
@@ -522,65 +522,65 @@ fn json_record_data(record: Record) -> JsonValue {
                     "longitude": loc.longitude.map(|e| e.to_string()),
                     "altitude": loc.altitude.to_string(),
                 },
-            }
+            })
         }
         Record::MX(mx) => {
-            object! {
+            json! ({
                 "preference": mx.preference,
                 "exchange": mx.exchange.to_string(),
-            }
+            })
         }
         Record::NAPTR(naptr) => {
-            object! {
+            json! ({
                 "order": naptr.order,
                 "flags": String::from_utf8_lossy(&naptr.flags).to_string(),
                 "service": String::from_utf8_lossy(&naptr.service).to_string(),
                 "regex": String::from_utf8_lossy(&naptr.regex).to_string(),
                 "replacement": naptr.replacement.to_string(),
-            }
+            })
         }
         Record::NS(ns) => {
-            object! {
+            json! ({
                 "nameserver": ns.nameserver.to_string(),
-            }
+            })
         }
         Record::OPENPGPKEY(opgp) => {
-            object! {
+            json! ({
                 "key": opgp.base64_key(),
-            }
+            })
         }
         Record::PTR(ptr) => {
-            object! {
+            json! ({
                 "cname": ptr.cname.to_string(),
-            }
+            })
         }
         Record::SSHFP(sshfp) => {
-            object! {
+            json! ({
                 "algorithm": sshfp.algorithm,
                 "fingerprint_type": sshfp.fingerprint_type,
                 "fingerprint": sshfp.hex_fingerprint(),
-            }
+            })
         }
         Record::SOA(soa) => {
-            object! {
+            json! ({
                 "mname": soa.mname.to_string(),
-            }
+            })
         }
         Record::SRV(srv) => {
-            object! {
+            json! ({
                 "priority": srv.priority,
                 "weight": srv.weight,
                 "port": srv.port,
                 "target": srv.target.to_string(),
-            }
+            })
         }
         Record::TLSA(tlsa) => {
-            object! {
+            json! ({
                 "certificate_usage": tlsa.certificate_usage,
                 "selector": tlsa.selector,
                 "matching_type": tlsa.matching_type,
                 "certificate_data": tlsa.hex_certificate_data(),
-            }
+            })
         }
         Record::TXT(txt) => {
             let ms = txt
@@ -588,21 +588,21 @@ fn json_record_data(record: Record) -> JsonValue {
                 .into_iter()
                 .map(|txt| String::from_utf8_lossy(&txt).to_string())
                 .collect::<Vec<_>>();
-            object! {
+            json! ({
                 "messages": ms,
-            }
+            })
         }
         Record::URI(uri) => {
-            object! {
+            json! ({
                 "priority": uri.priority,
                 "weight": uri.weight,
                 "target": String::from_utf8_lossy(&uri.target).to_string(),
-            }
+            })
         }
         Record::Other { bytes, .. } => {
-            object! {
+            json! ({
                 "bytes": bytes,
-            }
+            })
         }
     }
 }
@@ -659,7 +659,9 @@ fn erroneous_phase(error: &TransportError) -> &'static str {
         #[cfg(feature = "with_nativetls")]
         TransportError::TlsError(_) | TransportError::TlsHandshakeError(_) => "tls",
         #[cfg(feature = "with_rustls")]
-        TransportError::RustlsInvalidDnsNameError(_) => "tls", // TODO: Actually wrong, could be https
+        TransportError::RustlsInvalidDnsNameError => "tls", // TODO: Actually wrong, could be https
+        #[cfg(feature = "with_rustls")]
+        TransportError::RustlsError(_) => "tls",
         #[cfg(feature = "with_https")]
         TransportError::HttpError(_) | TransportError::WrongHttpStatus(_, _) => "http",
     }
@@ -675,8 +677,10 @@ fn error_message(error: TransportError) -> String {
         TransportError::TlsError(e) => e.to_string(),
         #[cfg(feature = "with_nativetls")]
         TransportError::TlsHandshakeError(e) => e.to_string(),
+        #[cfg(feature = "with_rustls")]
+        TransportError::RustlsError(e) => e.to_string(),
         #[cfg(any(feature = "with_rustls"))]
-        TransportError::RustlsInvalidDnsNameError(e) => e.to_string(),
+        TransportError::RustlsInvalidDnsNameError => "Invalid DNS name for rustls".to_string(),
         #[cfg(feature = "with_https")]
         TransportError::HttpError(e) => e.to_string(),
         #[cfg(feature = "with_https")]

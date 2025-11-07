@@ -1,3 +1,4 @@
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use log::*;
 
 use crate::wire::*;
@@ -38,7 +39,7 @@ impl Wire for OPENPGPKEY {
 impl OPENPGPKEY {
     /// The base64-encoded PGP key.
     pub fn base64_key(&self) -> String {
-        base64::encode(&self.key)
+        STANDARD.encode(&self.key)
     }
 }
 

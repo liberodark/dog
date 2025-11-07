@@ -22,7 +22,10 @@ pub enum Error {
 
     /// Provided dns name is not valid
     #[cfg(feature = "with_rustls")]
-    RustlsInvalidDnsNameError(webpki::InvalidDNSNameError),
+    RustlsInvalidDnsNameError,
+
+    #[cfg(feature = "with_rustls")]
+    RustlsError(rustls::Error),
 
     /// There was a problem decoding the response HTTP headers or body.
     #[cfg(feature = "with_https")]
@@ -63,9 +66,9 @@ impl From<native_tls::HandshakeError<std::net::TcpStream>> for Error {
 }
 
 #[cfg(feature = "with_rustls")]
-impl From<webpki::InvalidDNSNameError> for Error {
-    fn from(inner: webpki::InvalidDNSNameError) -> Self {
-        Self::RustlsInvalidDnsNameError(inner)
+impl From<rustls::Error> for Error {
+    fn from(inner: rustls::Error) -> Self {
+        Self::RustlsError(inner)
     }
 }
 
