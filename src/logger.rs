@@ -24,7 +24,7 @@ pub fn configure<T: AsRef<OsStr>>(ev: Option<T>) {
 
     let result = log::set_logger(GLOBAL_LOGGER);
     if let Err(e) = result {
-        eprintln!("Failed to initialise logger: {}", e);
+        eprintln!("Failed to initialise logger: {e}");
     }
 }
 

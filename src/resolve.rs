@@ -66,7 +66,7 @@ impl Resolver {
         for search in &self.search_list {
             match Labels::encode(search) {
                 Ok(suffix) => list.push(name.extend(&suffix)),
-                Err(_) => warn!("Invalid search list: {}", search),
+                Err(_) => warn!("Invalid search list: {search}"),
             }
         }
 
@@ -102,13 +102,17 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
 
             match ip {
                 Ok(_ip) => nameservers.push(nameserver_str.into()),
-                Err(e) => warn!("Failed to parse nameserver line {:?}: {}", line, e),
+                Err(e) => warn!("Failed to parse nameserver line {line:?}: {e}"),
             }
         }
 
         if let Some(search_str) = line.strip_prefix("search ") {
             search_list.clear();
-            search_list.extend(search_str.split_ascii_whitespace().map(|s| s.into()));
+            search_list.extend(
+                search_str
+                    .split_ascii_whitespace()
+                    .map(std::convert::Into::into),
+            );
         }
     }
 
@@ -249,7 +253,7 @@ impl fmt::Display for ResolverLookupError {
                 write!(f, "No nameserver found")
             }
             Self::IO(ioe) => {
-                write!(f, "Error reading network configuration: {}", ioe)
+                write!(f, "Error reading network configuration: {ioe}")
             }
             #[cfg(windows)]
             Self::Windows(ipe) => {

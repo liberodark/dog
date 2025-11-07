@@ -67,7 +67,7 @@ impl LocalHosts {
                         hostnames.insert(hn);
                     }
                     Err(e) => {
-                        warn!("Failed to encode local host hint {:?}: {}", hostname, e);
+                        warn!("Failed to encode local host hint {hostname:?}: {e}");
                     }
                 }
             }

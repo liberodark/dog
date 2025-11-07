@@ -65,8 +65,8 @@ impl Table {
                     qtype,
                     qname,
                     ttl,
-                    summary,
                     section,
+                    summary,
                 });
             }
             Answer::Pseudo { qname, opt } => {
@@ -107,7 +107,7 @@ impl Table {
                         print!(" ");
                     }
 
-                    print!("{}", ttl);
+                    print!("{ttl}");
                 } else {
                     for _ in 0..ttl_len {
                         print!(" ");
