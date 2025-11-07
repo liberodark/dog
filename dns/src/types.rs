@@ -3,14 +3,12 @@
 //! with the request packet having zero answer fields, and the response packet
 //! having at least one record in its answer fields.
 
-use crate::record::{Record, RecordType, OPT};
+use crate::record::{OPT, Record, RecordType};
 use crate::strings::Labels;
-
 
 /// A request that gets sent out over a transport.
 #[derive(PartialEq, Debug)]
 pub struct Request {
-
     /// The transaction ID of this request. This is used to make sure
     /// different DNS packets don’t answer each other’s questions.
     pub transaction_id: u16,
@@ -27,11 +25,9 @@ pub struct Request {
     pub additional: Option<OPT>,
 }
 
-
 /// A response obtained from a DNS server.
 #[derive(PartialEq, Debug)]
 pub struct Response {
-
     /// The transaction ID, which should match the ID of the request.
     pub transaction_id: u16,
 
@@ -51,11 +47,9 @@ pub struct Response {
     pub additionals: Vec<Answer>,
 }
 
-
 /// A DNS query section.
 #[derive(PartialEq, Debug)]
 pub struct Query {
-
     /// The domain name being queried, in human-readable dotted notation.
     pub qname: Labels,
 
@@ -66,14 +60,11 @@ pub struct Query {
     pub qtype: RecordType,
 }
 
-
 /// A DNS answer section.
 #[derive(PartialEq, Debug)]
 pub enum Answer {
-
     /// This is a standard answer with every field.
     Standard {
-
         /// The domain name being answered for.
         qname: Labels,
 
@@ -90,7 +81,6 @@ pub enum Answer {
     /// This is a pseudo-record answer, so some of the fields (class and TTL)
     /// have different meaning.
     Pseudo {
-
         /// The domain name being answered for.
         qname: Labels,
 
@@ -99,12 +89,10 @@ pub enum Answer {
     },
 }
 
-
 /// A DNS record class. Of these, the only one that’s in regular use anymore
 /// is the Internet class.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum QClass {
-
     /// The **Internet** class.
     IN,
 
@@ -118,11 +106,9 @@ pub enum QClass {
     Other(u16),
 }
 
-
 /// The flags that accompany every DNS packet.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Flags {
-
     /// Whether this packet is a response packet.
     pub response: bool,
 
@@ -153,11 +139,9 @@ pub struct Flags {
     pub error_code: Option<ErrorCode>,
 }
 
-
 /// A number representing the operation being performed.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Opcode {
-
     /// This request is a standard query, or this response is answering a
     /// standard query.
     Query,
@@ -167,7 +151,6 @@ pub enum Opcode {
     Other(u8),
 }
 
-
 /// A code indicating an error.
 ///
 /// # References
@@ -176,7 +159,6 @@ pub enum Opcode {
 ///   Name System (DNS) IANA Considerations (April 2013)
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ErrorCode {
-
     /// `FormErr` — The server was unable to interpret the query.
     FormatError,
 
@@ -201,12 +183,10 @@ pub enum ErrorCode {
     Other(u16),
 
     /// An error code within the ‘Reserved for Private Use’ range.
-    Private(u16)
+    Private(u16),
 }
 
-
 impl Answer {
-
     /// Whether this Answer holds a standard record, not a pseudo record.
     pub fn is_standard(&self) -> bool {
         matches!(self, Self::Standard { .. })

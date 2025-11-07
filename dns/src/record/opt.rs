@@ -5,7 +5,6 @@ use log::*;
 
 use crate::wire::*;
 
-
 /// A **OPT** _(options)_ pseudo-record, which is used to extend the DNS
 /// protocol with additional flags such as DNSSEC stuff.
 ///
@@ -32,7 +31,6 @@ use crate::wire::*;
 ///   for DNS (April 2013)
 #[derive(PartialEq, Debug, Clone)]
 pub struct OPT {
-
     /// The maximum size of a UDP packet that the client supports.
     pub udp_payload_size: u16,
 
@@ -50,7 +48,6 @@ pub struct OPT {
 }
 
 impl OPT {
-
     /// The record type number associated with OPT.
     pub const RR_TYPE: u16 = 41;
 
@@ -64,16 +61,16 @@ impl OPT {
     /// Unlike the `Wire::read` function, this does not require a length.
     #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     pub fn read(c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
-        let udp_payload_size = c.read_u16::<BigEndian>()?;  // replaces the class field
+        let udp_payload_size = c.read_u16::<BigEndian>()?; // replaces the class field
         trace!("Parsed UDP payload size -> {:?}", udp_payload_size);
 
-        let higher_bits = c.read_u8()?;  // replaces the ttl field...
+        let higher_bits = c.read_u8()?; // replaces the ttl field...
         trace!("Parsed higher bits -> {:#08b}", higher_bits);
 
-        let edns0_version = c.read_u8()?;  // ...as does this...
+        let edns0_version = c.read_u8()?; // ...as does this...
         trace!("Parsed EDNS(0) version -> {:?}", edns0_version);
 
-        let flags = c.read_u16::<BigEndian>()?;  // ...as does this
+        let flags = c.read_u16::<BigEndian>()?; // ...as does this
         trace!("Parsed flags -> {:#08b}", flags);
 
         let data_length = c.read_u16::<BigEndian>()?;
@@ -83,7 +80,13 @@ impl OPT {
         c.read_exact(&mut data)?;
         trace!("Parsed data -> {:#x?}", data);
 
-        Ok(Self { udp_payload_size, higher_bits, edns0_version, flags, data })
+        Ok(Self {
+            udp_payload_size,
+            higher_bits,
+            edns0_version,
+            flags,
+            data,
+        })
     }
 
     /// Serialises this OPT record into a vector of bytes.
@@ -111,7 +114,6 @@ impl OPT {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -120,57 +122,59 @@ mod test {
     #[test]
     fn parses_no_data() {
         let buf = &[
-            0x05, 0xAC,  // UDP payload size
-            0x00,        // higher bits
-            0x00, 0x00,  // EDNS(0) version
-            0x00, 0x00,  // flags
-            0x00,        // data length (followed by no data)
+            0x05, 0xAC, // UDP payload size
+            0x00, // higher bits
+            0x00, 0x00, // EDNS(0) version
+            0x00, 0x00, // flags
+            0x00, // data length (followed by no data)
         ];
 
-        assert_eq!(OPT::read(&mut Cursor::new(buf)).unwrap(),
-                   OPT {
-                       udp_payload_size: 1452,
-                       higher_bits: 0,
-                       edns0_version: 0,
-                       flags: 0,
-                       data: vec![],
-                   });
+        assert_eq!(
+            OPT::read(&mut Cursor::new(buf)).unwrap(),
+            OPT {
+                udp_payload_size: 1452,
+                higher_bits: 0,
+                edns0_version: 0,
+                flags: 0,
+                data: vec![],
+            }
+        );
     }
 
     #[test]
     fn parses_with_data() {
         let buf = &[
-            0x05, 0xAC,  // UDP payload size
-            0x00,        // higher bits
-            0x00, 0x00,  // EDNS(0) version
-            0x00, 0x00,  // flags
-            0x04,        // data length
-            0x01, 0x02, 0x03, 0x04,  // data
+            0x05, 0xAC, // UDP payload size
+            0x00, // higher bits
+            0x00, 0x00, // EDNS(0) version
+            0x00, 0x00, // flags
+            0x04, // data length
+            0x01, 0x02, 0x03, 0x04, // data
         ];
 
-        assert_eq!(OPT::read(&mut Cursor::new(buf)).unwrap(),
-                   OPT {
-                       udp_payload_size: 1452,
-                       higher_bits: 0,
-                       edns0_version: 0,
-                       flags: 0,
-                       data: vec![1, 2, 3, 4],
-                   });
+        assert_eq!(
+            OPT::read(&mut Cursor::new(buf)).unwrap(),
+            OPT {
+                udp_payload_size: 1452,
+                higher_bits: 0,
+                edns0_version: 0,
+                flags: 0,
+                data: vec![1, 2, 3, 4],
+            }
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(OPT::read(&mut Cursor::new(&[])),
-                   Err(WireError::IO));
+        assert_eq!(OPT::read(&mut Cursor::new(&[])), Err(WireError::IO));
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x05,  // half a UDP payload size
+            0x05, // half a UDP payload size
         ];
 
-        assert_eq!(OPT::read(&mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(OPT::read(&mut Cursor::new(buf)), Err(WireError::IO));
     }
 }

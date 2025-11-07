@@ -5,8 +5,8 @@ use std::net::TcpStream;
 
 use log::*;
 
+use super::{Error, Transport};
 use dns::{Request, Response, WireError};
-use super::{Transport, Error};
 
 use super::tls_stream;
 
@@ -17,7 +17,6 @@ pub struct HttpsTransport {
 }
 
 impl HttpsTransport {
-
     /// Creates a new HTTPS transport that connects to the given URL.
     pub fn new(url: String) -> Self {
         Self { url }
@@ -25,18 +24,19 @@ impl HttpsTransport {
 }
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|window| window == needle)
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn contains_header(buf: &[u8]) -> bool {
-    let header_end: [u8; 4] = [ 13, 10, 13, 10 ];
+    let header_end: [u8; 4] = [13, 10, 13, 10];
     find_subsequence(buf, &header_end).is_some()
 }
 
 use tls_stream::TlsStream;
 
 impl Transport for HttpsTransport {
-
     #[cfg(any(feature = "with_https"))]
     fn send(&self, request: &Request) -> Result<Response, Error> {
         let (domain, path) = self.split_domain().expect("Invalid HTTPS nameserver");
@@ -47,17 +47,27 @@ impl Transport for HttpsTransport {
         debug!("Connected");
 
         let request_bytes = request.to_bytes().expect("failed to serialise request");
-        let mut bytes_to_send = format!("\
+        let mut bytes_to_send = format!(
+            "\
             POST {} HTTP/1.1\r\n\
             Host: {}\r\n\
             Content-Type: application/dns-message\r\n\
             Accept: application/dns-message\r\n\
             User-Agent: {}\r\n\
             Content-Length: {}\r\n\r\n",
-            path, domain, USER_AGENT, request_bytes.len()).into_bytes();
+            path,
+            domain,
+            USER_AGENT,
+            request_bytes.len()
+        )
+        .into_bytes();
         bytes_to_send.extend(request_bytes);
 
-        info!("Sending {} bytes of data to {:?} over HTTPS", bytes_to_send.len(), self.url);
+        info!(
+            "Sending {} bytes of data to {:?} over HTTPS",
+            bytes_to_send.len(),
+            self.url
+        );
         stream.write_all(&bytes_to_send)?;
         debug!("Wrote all bytes");
 
@@ -98,7 +108,7 @@ impl Transport for HttpsTransport {
             read_len += stream.read(&mut buf[read_len..])?;
         }
 
-        let body = &buf[index .. read_len];
+        let body = &buf[index..read_len];
         debug!("HTTP body has {} bytes", body.len());
         let response = Response::from_bytes(&body)?;
         Ok(response)
@@ -114,7 +124,7 @@ impl HttpsTransport {
     fn split_domain(&self) -> Option<(&str, &str)> {
         if let Some(sp) = self.url.strip_prefix("https://") {
             if let Some(colon_index) = sp.find('/') {
-                return Some((&sp[.. colon_index], &sp[colon_index ..]));
+                return Some((&sp[..colon_index], &sp[colon_index..]));
             }
         }
 
@@ -124,4 +134,3 @@ impl HttpsTransport {
 
 /// The User-Agent header sent with HTTPS requests.
 static USER_AGENT: &str = concat!("dog/", env!("CARGO_PKG_VERSION"));
-

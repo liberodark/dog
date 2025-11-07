@@ -18,27 +18,35 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use datetime::{LocalDateTime, ISO};
-
+use datetime::{ISO, LocalDateTime};
 
 /// The build script entry point.
 fn main() -> io::Result<()> {
     #![allow(clippy::write_with_newline)]
 
-    let usage   = include_str!("src/usage.txt");
+    let usage = include_str!("src/usage.txt");
     let tagline = "dog \\1;32m●\\0m command-line DNS client";
-    let url     = "https://dns.lookup.dog/";
+    let url = "https://dns.lookup.dog/";
 
-    let ver =
-        if is_debug_build() {
-            format!("{}\nv{} \\1;31m(pre-release debug build!)\\0m\n\\1;4;34m{}\\0m", tagline, version_string(), url)
-        }
-        else if is_development_version() {
-            format!("{}\nv{} [{}] built on {} \\1;31m(pre-release!)\\0m\n\\1;4;34m{}\\0m", tagline, version_string(), git_hash(), build_date(), url)
-        }
-        else {
-            format!("{}\nv{}\n\\1;4;34m{}\\0m", tagline, version_string(), url)
-        };
+    let ver = if is_debug_build() {
+        format!(
+            "{}\nv{} \\1;31m(pre-release debug build!)\\0m\n\\1;4;34m{}\\0m",
+            tagline,
+            version_string(),
+            url
+        )
+    } else if is_development_version() {
+        format!(
+            "{}\nv{} [{}] built on {} \\1;31m(pre-release!)\\0m\n\\1;4;34m{}\\0m",
+            tagline,
+            version_string(),
+            git_hash(),
+            build_date(),
+            url
+        )
+    } else {
+        format!("{}\nv{}\n\\1;4;34m{}\\0m", tagline, version_string(), url)
+    };
 
     // We need to create these files in the Cargo output directory.
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -73,15 +81,16 @@ fn convert_codes(input: &str) -> String {
 
 /// Removes escape codes from ‘usage.txt’.
 fn strip_codes(input: &str) -> String {
-    input.replace("\\0m", "")
-         .replace("\\1m", "")
-         .replace("\\4m", "")
-         .replace("\\32m", "")
-         .replace("\\33m", "")
-         .replace("\\1;31m", "")
-         .replace("\\1;32m", "")
-         .replace("\\1;33m", "")
-         .replace("\\1;4;34", "")
+    input
+        .replace("\\0m", "")
+        .replace("\\1m", "")
+        .replace("\\4m", "")
+        .replace("\\32m", "")
+        .replace("\\33m", "")
+        .replace("\\1;31m", "")
+        .replace("\\1;32m", "")
+        .replace("\\1;33m", "")
+        .replace("\\1;4;34", "")
 }
 
 /// Retrieve the project’s current Git hash, as a string.
@@ -91,8 +100,12 @@ fn git_hash() -> String {
     String::from_utf8_lossy(
         &Command::new("git")
             .args(&["rev-parse", "--short", "HEAD"])
-            .output().unwrap()
-            .stdout).trim().to_string()
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .trim()
+    .to_string()
 }
 
 /// Whether we should show pre-release info in the version string.
@@ -118,7 +131,7 @@ fn version_string() -> String {
     let mut ver = cargo_version();
 
     let feats = nonstandard_features_string();
-    if ! feats.is_empty() {
+    if !feats.is_empty() {
         ver.push_str(&format!(" [{}]", &feats));
     }
 
@@ -128,7 +141,7 @@ fn version_string() -> String {
 /// Finds whether a feature is enabled by examining the Cargo variable.
 fn feature_enabled(name: &str) -> bool {
     env::var(&format!("CARGO_FEATURE_{}", name))
-        .map(|e| ! e.is_empty())
+        .map(|e| !e.is_empty())
         .unwrap_or(false)
 }
 
@@ -136,21 +149,20 @@ fn feature_enabled(name: &str) -> bool {
 fn nonstandard_features_string() -> String {
     let mut s = Vec::new();
 
-    if ! feature_enabled("WITH_IDNA") {
+    if !feature_enabled("WITH_IDNA") {
         s.push("-idna");
     }
 
-    if ! feature_enabled("WITH_TLS") {
+    if !feature_enabled("WITH_TLS") {
         s.push("-tls");
     }
 
-    if ! feature_enabled("WITH_HTTPS") {
+    if !feature_enabled("WITH_HTTPS") {
         s.push("-https");
     }
 
     s.join(", ")
 }
-
 
 /// Formats the current date as an ISO 8601 string.
 fn build_date() -> String {

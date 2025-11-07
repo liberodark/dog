@@ -1,7 +1,7 @@
-use std::net::TcpStream;
 use super::Error;
 use super::HttpsTransport;
 use super::TlsTransport;
+use std::net::TcpStream;
 
 #[cfg(any(feature = "with_nativetls", feature = "with_nativetls_vendored"))]
 fn stream_nativetls(domain: &str, port: u16) -> Result<native_tls::TlsStream<TcpStream>, Error> {
@@ -11,12 +11,17 @@ fn stream_nativetls(domain: &str, port: u16) -> Result<native_tls::TlsStream<Tcp
 }
 
 #[cfg(feature = "with_rustls")]
-fn stream_rustls(domain: &str, port: u16) -> Result<rustls::StreamOwned<rustls::ClientSession,TcpStream>, Error> {
+fn stream_rustls(
+    domain: &str,
+    port: u16,
+) -> Result<rustls::StreamOwned<rustls::ClientSession, TcpStream>, Error> {
     use std::sync::Arc;
 
     let mut config = rustls::ClientConfig::new();
 
-    config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+    config
+        .root_store
+        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
     let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain)?;
 
@@ -66,4 +71,3 @@ cfg_if::cfg_if! {
         unreachable!("tls/https enabled but no tls implementation provided")
     }
 }
-

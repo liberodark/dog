@@ -3,7 +3,6 @@ use log::*;
 use crate::strings::{Labels, ReadLabels};
 use crate::wire::*;
 
-
 /// A **PTR** record, which holds a _pointer_ to a canonical name. This is
 /// most often used for reverse DNS lookups.
 ///
@@ -18,7 +17,6 @@ use crate::wire::*;
 ///   Implementation and Specification (November 1987)
 #[derive(PartialEq, Debug)]
 pub struct PTR {
-
     /// The CNAME contained in the record.
     pub cname: Labels,
 }
@@ -35,14 +33,18 @@ impl Wire for PTR {
         if stated_length == cname_length {
             trace!("Length is correct");
             Ok(Self { cname })
-        }
-        else {
-            warn!("Length is incorrect (stated length {:?}, cname length {:?}", stated_length, cname_length);
-            Err(WireError::WrongLabelLength { stated_length, length_after_labels: cname_length })
+        } else {
+            warn!(
+                "Length is incorrect (stated length {:?}, cname length {:?}",
+                stated_length, cname_length
+            );
+            Err(WireError::WrongLabelLength {
+                stated_length,
+                length_after_labels: cname_length,
+            })
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -52,40 +54,45 @@ mod test {
     #[test]
     fn parses() {
         let buf = &[
-            0x03, 0x64, 0x6e, 0x73, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,  // cname
-            0x00,  // cname terminator
+            0x03, 0x64, 0x6e, 0x73, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, // cname
+            0x00, // cname terminator
         ];
 
-        assert_eq!(PTR::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   PTR {
-                       cname: Labels::encode("dns.google").unwrap(),
-                   });
+        assert_eq!(
+            PTR::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            PTR {
+                cname: Labels::encode("dns.google").unwrap(),
+            }
+        );
     }
 
     #[test]
     fn incorrect_record_length() {
         let buf = &[
-            0x03, 0x65, 0x66, 0x67,  // cname
-            0x00,  // cname terminator
+            0x03, 0x65, 0x66, 0x67, // cname
+            0x00, // cname terminator
         ];
 
-        assert_eq!(PTR::read(6, &mut Cursor::new(buf)),
-                   Err(WireError::WrongLabelLength { stated_length: 6, length_after_labels: 5 }));
+        assert_eq!(
+            PTR::read(6, &mut Cursor::new(buf)),
+            Err(WireError::WrongLabelLength {
+                stated_length: 6,
+                length_after_labels: 5
+            })
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(PTR::read(0, &mut Cursor::new(&[])),
-                   Err(WireError::IO));
+        assert_eq!(PTR::read(0, &mut Cursor::new(&[])), Err(WireError::IO));
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x03, 0x64,  // the start of a cname
+            0x03, 0x64, // the start of a cname
         ];
 
-        assert_eq!(PTR::read(23, &mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(PTR::read(23, &mut Cursor::new(buf)), Err(WireError::IO));
     }
 }

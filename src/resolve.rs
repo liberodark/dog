@@ -7,11 +7,9 @@ use log::*;
 
 use dns::Labels;
 
-
 /// A **resolver type** is the source of a `Resolver`.
 #[derive(PartialEq, Debug)]
 pub enum ResolverType {
-
     /// Obtain a resolver by consulting the system in order to find a
     /// nameserver and a search list.
     SystemDefault,
@@ -21,29 +19,27 @@ pub enum ResolverType {
 }
 
 impl ResolverType {
-
     /// Obtains a resolver by the means specified in this type. Returns an
     /// error if there was a problem looking up system information, or if
     /// there is no suitable nameserver available.
     pub fn obtain(self) -> Result<Resolver, ResolverLookupError> {
         match self {
-            Self::SystemDefault => {
-                system_nameservers()
-            }
+            Self::SystemDefault => system_nameservers(),
             Self::Specific(nameserver) => {
                 let search_list = Vec::new();
-                Ok(Resolver { nameserver, search_list })
+                Ok(Resolver {
+                    nameserver,
+                    search_list,
+                })
             }
         }
     }
 }
 
-
 /// A **resolver** knows the address of the server we should
 /// send DNS requests to, and the search list for name lookup.
 #[derive(Debug)]
 pub struct Resolver {
-
     /// The address of the nameserver.
     pub nameserver: String,
 
@@ -52,7 +48,6 @@ pub struct Resolver {
 }
 
 impl Resolver {
-
     /// Returns a nameserver that queries should be sent to.
     pub fn nameserver(&self) -> String {
         self.nameserver.clone()
@@ -70,8 +65,8 @@ impl Resolver {
 
         for search in &self.search_list {
             match Labels::encode(search) {
-                Ok(suffix)  => list.push(name.extend(&suffix)),
-                Err(_)      => warn!("Invalid search list: {}", search),
+                Ok(suffix) => list.push(name.extend(&suffix)),
+                Err(_) => warn!("Invalid search list: {}", search),
             }
         }
 
@@ -79,7 +74,6 @@ impl Resolver {
         list
     }
 }
-
 
 /// Looks up the system default nameserver on Unix, by querying
 /// `/etc/resolv.conf` and using the first line that specifies one.
@@ -108,7 +102,7 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
 
             match ip {
                 Ok(_ip) => nameservers.push(nameserver_str.into()),
-                Err(e)  => warn!("Failed to parse nameserver line {:?}: {}", line, e),
+                Err(e) => warn!("Failed to parse nameserver line {:?}: {}", line, e),
             }
         }
 
@@ -119,18 +113,19 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
     }
 
     if let Some(nameserver) = nameservers.into_iter().next() {
-        Ok(Resolver { nameserver, search_list })
-    }
-    else {
+        Ok(Resolver {
+            nameserver,
+            search_list,
+        })
+    } else {
         Err(ResolverLookupError::NoNameserver)
     }
 }
 
-
 /// Looks up the system default nameserver on Windows, by iterating through
 /// the list of network adapters and returning the first nameserver it finds.
 #[cfg(windows)]
-#[allow(unused)]  // todo: Remove this when the time is right
+#[allow(unused)] // todo: Remove this when the time is right
 fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
     use std::net::{IpAddr, UdpSocket};
 
@@ -170,7 +165,7 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
         ForceIPFamily::None => get_ipv6().or(get_ipv4()).ok(),
     };
 
-    let search_list = Vec::new();  // todo: implement this
+    let search_list = Vec::new(); // todo: implement this
 
     let adapters = ipconfig::get_adapters()?;
     let active_adapters = adapters.iter().filter(|a| {
@@ -185,9 +180,11 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
     {
         debug!("Found first nameserver {:?}", dns_server);
         let nameserver = dns_server.to_string();
-        Ok(Resolver { nameserver, search_list })
+        Ok(Resolver {
+            nameserver,
+            search_list,
+        })
     }
-
     // Fallback
     else if let Some(dns_server) = active_adapters
         .flat_map(|a| a.dns_servers())
@@ -195,14 +192,14 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
     {
         debug!("Found first fallback nameserver {:?}", dns_server);
         let nameserver = dns_server.to_string();
-        Ok(Resolver { nameserver, search_list })
-    }
-
-    else {
+        Ok(Resolver {
+            nameserver,
+            search_list,
+        })
+    } else {
         Err(ResolverLookupError::NoNameserver)
     }
 }
-
 
 /// The fall-back system default nameserver determinator that is not very
 /// determined as it returns nothing without actually checking anything.
@@ -212,10 +209,8 @@ fn system_nameservers() -> Result<Resolver, ResolverLookupError> {
     Err(ResolverLookupError::UnsupportedPlatform)
 }
 
-
 /// Something that can go wrong while obtaining a `Resolver`.
 pub enum ResolverLookupError {
-
     /// The system information was successfully read, but there was no adapter
     /// suitable to use.
     NoNameserver,
@@ -262,7 +257,10 @@ impl fmt::Display for ResolverLookupError {
             }
             #[cfg(all(not(unix), not(windows)))]
             Self::UnsupportedPlatform => {
-                write!(f, "dog cannot automatically detect nameservers on this platform; you will have to provide one explicitly")
+                write!(
+                    f,
+                    "dog cannot automatically detect nameservers on this platform; you will have to provide one explicitly"
+                )
             }
         }
     }

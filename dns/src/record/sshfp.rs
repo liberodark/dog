@@ -2,7 +2,6 @@ use log::*;
 
 use crate::wire::*;
 
-
 /// A **SSHFP** _(secure shell fingerprint)_ record, which contains the
 /// fingerprint of an SSH public key.
 ///
@@ -12,7 +11,6 @@ use crate::wire::*;
 ///   Publish Secure Shell (SSH) Key Fingerprints (January 2006)
 #[derive(PartialEq, Debug)]
 pub struct SSHFP {
-
     /// The algorithm of the public key. This is a number with several defined
     /// mappings.
     pub algorithm: u8,
@@ -40,7 +38,10 @@ impl Wire for SSHFP {
 
         if stated_length <= 2 {
             let mandated_length = MandatedLength::AtLeast(3);
-            return Err(WireError::WrongRecordLength { stated_length, mandated_length });
+            return Err(WireError::WrongRecordLength {
+                stated_length,
+                mandated_length,
+            });
         }
 
         let fingerprint_length = stated_length - 1 - 1;
@@ -48,20 +49,23 @@ impl Wire for SSHFP {
         c.read_exact(&mut fingerprint)?;
         trace!("Parsed fingerprint -> {:#x?}", fingerprint);
 
-        Ok(Self { algorithm, fingerprint_type, fingerprint })
+        Ok(Self {
+            algorithm,
+            fingerprint_type,
+            fingerprint,
+        })
     }
 }
 
 impl SSHFP {
-
     /// Returns the hexadecimal representation of the fingerprint.
     pub fn hex_fingerprint(&self) -> String {
-        self.fingerprint.iter()
+        self.fingerprint
+            .iter()
             .map(|byte| format!("{:02x}", byte))
             .collect()
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -70,60 +74,67 @@ mod test {
     #[test]
     fn parses() {
         let buf = &[
-            0x01,  // algorithm
-            0x01,  // fingerprint type
-            0x21, 0x22, 0x23, 0x24, 0x25, 0x26,  // a short fingerprint
+            0x01, // algorithm
+            0x01, // fingerprint type
+            0x21, 0x22, 0x23, 0x24, 0x25, 0x26, // a short fingerprint
         ];
 
-        assert_eq!(SSHFP::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   SSHFP {
-                       algorithm: 1,
-                       fingerprint_type: 1,
-                       fingerprint: vec![ 0x21, 0x22, 0x23, 0x24, 0x25, 0x26 ],
-                   });
+        assert_eq!(
+            SSHFP::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            SSHFP {
+                algorithm: 1,
+                fingerprint_type: 1,
+                fingerprint: vec![0x21, 0x22, 0x23, 0x24, 0x25, 0x26],
+            }
+        );
     }
 
     #[test]
     fn one_byte_fingerprint() {
         let buf = &[
-            0x01,  // algorithm
-            0x01,  // fingerprint type
-            0x21,  // an extremely short fingerprint
+            0x01, // algorithm
+            0x01, // fingerprint type
+            0x21, // an extremely short fingerprint
         ];
 
-        assert_eq!(SSHFP::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   SSHFP {
-                       algorithm: 1,
-                       fingerprint_type: 1,
-                       fingerprint: vec![ 0x21 ],
-                   });
+        assert_eq!(
+            SSHFP::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            SSHFP {
+                algorithm: 1,
+                fingerprint_type: 1,
+                fingerprint: vec![0x21],
+            }
+        );
     }
 
     #[test]
     fn record_too_short() {
         let buf = &[
-            0x01,  // algorithm
-            0x01,  // fingerprint type
+            0x01, // algorithm
+            0x01, // fingerprint type
         ];
 
-        assert_eq!(SSHFP::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongRecordLength { stated_length: 2, mandated_length: MandatedLength::AtLeast(3) }));
+        assert_eq!(
+            SSHFP::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongRecordLength {
+                stated_length: 2,
+                mandated_length: MandatedLength::AtLeast(3)
+            })
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(SSHFP::read(0, &mut Cursor::new(&[])),
-                   Err(WireError::IO));
+        assert_eq!(SSHFP::read(0, &mut Cursor::new(&[])), Err(WireError::IO));
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x01,  // algorithm
+            0x01, // algorithm
         ];
 
-        assert_eq!(SSHFP::read(6, &mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(SSHFP::read(6, &mut Cursor::new(buf)), Err(WireError::IO));
     }
 
     #[test]
@@ -131,10 +142,9 @@ mod test {
         let sshfp = SSHFP {
             algorithm: 1,
             fingerprint_type: 1,
-            fingerprint: vec![ 0xf3, 0x48, 0xcd, 0xc9 ],
+            fingerprint: vec![0xf3, 0x48, 0xcd, 0xc9],
         };
 
-        assert_eq!(sshfp.hex_fingerprint(),
-                   String::from("f348cdc9"));
+        assert_eq!(sshfp.hex_fingerprint(), String::from("f348cdc9"));
     }
 }

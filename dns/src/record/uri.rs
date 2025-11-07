@@ -2,7 +2,6 @@ use log::*;
 
 use crate::wire::*;
 
-
 /// A **URI** record, which holds a URI along with weight and priority values
 /// to balance between several records.
 ///
@@ -14,7 +13,6 @@ use crate::wire::*;
 ///   Identifier (URI): Generic Syntax (January 2005)
 #[derive(PartialEq, Debug)]
 pub struct URI {
-
     /// The priority of the URI. Clients are supposed to contact the URI with
     /// the lowest priority out of all the ones it can reach.
     pub priority: u16,
@@ -43,7 +41,10 @@ impl Wire for URI {
         // The target must not be empty.
         if stated_length <= 4 {
             let mandated_length = MandatedLength::AtLeast(5);
-            return Err(WireError::WrongRecordLength { stated_length, mandated_length });
+            return Err(WireError::WrongRecordLength {
+                stated_length,
+                mandated_length,
+            });
         }
 
         let remaining_length = stated_length - 4;
@@ -51,10 +52,13 @@ impl Wire for URI {
         c.read_exact(&mut target)?;
         trace!("Parsed target -> {:?}", String::from_utf8_lossy(&target));
 
-        Ok(Self { priority, weight, target })
+        Ok(Self {
+            priority,
+            weight,
+            target,
+        })
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -64,60 +68,67 @@ mod test {
     #[test]
     fn parses() {
         let buf = &[
-            0x00, 0x0A,  // priority
-            0x00, 0x10,  // weight
-            0x68, 0x74, 0x74, 0x70, 0x73, 0x3a, 0x2f, 0x2f, 0x72, 0x66, 0x63,
-            0x73, 0x2e, 0x69, 0x6f, 0x2f,  // uri
+            0x00, 0x0A, // priority
+            0x00, 0x10, // weight
+            0x68, 0x74, 0x74, 0x70, 0x73, 0x3a, 0x2f, 0x2f, 0x72, 0x66, 0x63, 0x73, 0x2e, 0x69,
+            0x6f, 0x2f, // uri
         ];
 
-        assert_eq!(URI::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   URI {
-                       priority: 10,
-                       weight: 16,
-                       target: Box::new(*b"https://rfcs.io/"),
-                   });
+        assert_eq!(
+            URI::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            URI {
+                priority: 10,
+                weight: 16,
+                target: Box::new(*b"https://rfcs.io/"),
+            }
+        );
     }
 
     #[test]
     fn one_byte_of_uri() {
         let buf = &[
-            0x00, 0x0A,  // priority
-            0x00, 0x10,  // weight
-            0x2f,  // one byte of uri (invalid but still a legitimate DNS record)
+            0x00, 0x0A, // priority
+            0x00, 0x10, // weight
+            0x2f, // one byte of uri (invalid but still a legitimate DNS record)
         ];
 
-        assert_eq!(URI::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   URI {
-                       priority: 10,
-                       weight: 16,
-                       target: Box::new(*b"/"),
-                   });
+        assert_eq!(
+            URI::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            URI {
+                priority: 10,
+                weight: 16,
+                target: Box::new(*b"/"),
+            }
+        );
     }
 
     #[test]
     fn missing_any_data() {
         let buf = &[
-            0x00, 0x0A,  // priority
-            0x00, 0x10,  // weight
+            0x00, 0x0A, // priority
+            0x00, 0x10, // weight
         ];
 
-        assert_eq!(URI::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongRecordLength { stated_length: 4, mandated_length: MandatedLength::AtLeast(5) }));
+        assert_eq!(
+            URI::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongRecordLength {
+                stated_length: 4,
+                mandated_length: MandatedLength::AtLeast(5)
+            })
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(URI::read(0, &mut Cursor::new(&[])),
-                   Err(WireError::IO));
+        assert_eq!(URI::read(0, &mut Cursor::new(&[])), Err(WireError::IO));
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x00, 0x0A,  // half a priority
+            0x00, 0x0A, // half a priority
         ];
 
-        assert_eq!(URI::read(23, &mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(URI::read(23, &mut Cursor::new(buf)), Err(WireError::IO));
     }
 }

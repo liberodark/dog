@@ -4,7 +4,6 @@ use log::*;
 
 use crate::wire::*;
 
-
 /// A **AAAA** record, which contains an `Ipv6Address`.
 ///
 /// # References
@@ -13,7 +12,6 @@ use crate::wire::*;
 ///   Support IP Version 6 (October 2003)
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct AAAA {
-
     /// The IPv6 address contained in the packet.
     pub address: Ipv6Addr,
 }
@@ -25,9 +23,15 @@ impl Wire for AAAA {
     #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         if stated_length != 16 {
-            warn!("Length is incorrect (stated length {:?}, but should be sixteen)", stated_length);
+            warn!(
+                "Length is incorrect (stated length {:?}, but should be sixteen)",
+                stated_length
+            );
             let mandated_length = MandatedLength::Exactly(16);
-            return Err(WireError::WrongRecordLength { stated_length, mandated_length });
+            return Err(WireError::WrongRecordLength {
+                stated_length,
+                mandated_length,
+            });
         }
 
         let mut buf = [0_u8; 16];
@@ -40,7 +44,6 @@ impl Wire for AAAA {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -49,49 +52,67 @@ mod test {
     #[test]
     fn parses() {
         let buf = &[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // IPv6 address
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, // IPv6 address
         ];
 
-        assert_eq!(AAAA::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   AAAA { address: Ipv6Addr::new(0,0,0,0,0,0,0,0) });
+        assert_eq!(
+            AAAA::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            AAAA {
+                address: Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)
+            }
+        );
     }
 
     #[test]
     fn record_too_long() {
         let buf = &[
-            0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09,
-            0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09,  // IPv6 address
-            0x09,  // Unexpected extra byte
+            0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09,
+            0x09, 0x09, // IPv6 address
+            0x09, // Unexpected extra byte
         ];
 
-        assert_eq!(AAAA::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongRecordLength { stated_length: 17, mandated_length: MandatedLength::Exactly(16) }));
+        assert_eq!(
+            AAAA::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongRecordLength {
+                stated_length: 17,
+                mandated_length: MandatedLength::Exactly(16)
+            })
+        );
     }
 
     #[test]
     fn record_too_short() {
         let buf = &[
-            0x05, 0x05, 0x05, 0x05, 0x05,  // Five arbitrary bytes
+            0x05, 0x05, 0x05, 0x05, 0x05, // Five arbitrary bytes
         ];
 
-        assert_eq!(AAAA::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongRecordLength { stated_length: 5, mandated_length: MandatedLength::Exactly(16) }));
+        assert_eq!(
+            AAAA::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongRecordLength {
+                stated_length: 5,
+                mandated_length: MandatedLength::Exactly(16)
+            })
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(AAAA::read(0, &mut Cursor::new(&[])),
-                   Err(WireError::WrongRecordLength { stated_length: 0, mandated_length: MandatedLength::Exactly(16) }));
+        assert_eq!(
+            AAAA::read(0, &mut Cursor::new(&[])),
+            Err(WireError::WrongRecordLength {
+                stated_length: 0,
+                mandated_length: MandatedLength::Exactly(16)
+            })
+        );
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x05, 0x05, 0x05, 0x05, 0x05,  // Five arbitrary bytes
+            0x05, 0x05, 0x05, 0x05, 0x05, // Five arbitrary bytes
         ];
 
-        assert_eq!(AAAA::read(16, &mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(AAAA::read(16, &mut Cursor::new(buf)), Err(WireError::IO));
     }
 }

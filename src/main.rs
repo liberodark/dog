@@ -10,7 +10,6 @@
 #![warn(single_use_lifetimes)]
 #![warn(trivial_casts, trivial_numeric_casts)]
 #![warn(unused)]
-
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::enum_glob_use)]
 #![allow(clippy::module_name_repetitions)]
@@ -18,7 +17,6 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::wildcard_imports)]
-
 #![deny(unsafe_code)]
 
 use log::*;
@@ -35,7 +33,6 @@ mod txid;
 
 mod options;
 use self::options::*;
-
 
 /// Configures logging, parses the command-line options, and handles any
 /// errors before passing control over to the Dog type.
@@ -59,26 +56,35 @@ fn main() {
 
         OptionsResult::Help(help_reason, use_colours) => {
             if use_colours.should_use_colours() {
-                print!("{}", include_str!(concat!(env!("OUT_DIR"), "/usage.pretty.txt")));
-            }
-            else {
-                print!("{}", include_str!(concat!(env!("OUT_DIR"), "/usage.bland.txt")));
+                print!(
+                    "{}",
+                    include_str!(concat!(env!("OUT_DIR"), "/usage.pretty.txt"))
+                );
+            } else {
+                print!(
+                    "{}",
+                    include_str!(concat!(env!("OUT_DIR"), "/usage.bland.txt"))
+                );
             }
 
             if help_reason == HelpReason::NoDomains {
                 exit(exits::OPTIONS_ERROR);
-            }
-            else {
+            } else {
                 exit(exits::SUCCESS);
             }
         }
 
         OptionsResult::Version(use_colours) => {
             if use_colours.should_use_colours() {
-                print!("{}", include_str!(concat!(env!("OUT_DIR"), "/version.pretty.txt")));
-            }
-            else {
-                print!("{}", include_str!(concat!(env!("OUT_DIR"), "/version.bland.txt")));
+                print!(
+                    "{}",
+                    include_str!(concat!(env!("OUT_DIR"), "/version.pretty.txt"))
+                );
+            } else {
+                print!(
+                    "{}",
+                    include_str!(concat!(env!("OUT_DIR"), "/version.bland.txt"))
+                );
             }
 
             exit(exits::SUCCESS);
@@ -96,15 +102,24 @@ fn main() {
     }
 }
 
-
 /// Runs dog with some options, returning the status to exit with.
-fn run(Options { requests, format, measure_time }: Options) -> i32 {
+fn run(
+    Options {
+        requests,
+        format,
+        measure_time,
+    }: Options,
+) -> i32 {
     use std::time::Instant;
 
     let should_show_opt = requests.edns.should_show();
 
     let mut responses = Vec::new();
-    let timer = if measure_time { Some(Instant::now()) } else { None };
+    let timer = if measure_time {
+        Some(Instant::now())
+    } else {
+        None
+    };
 
     let mut errored = false;
 
@@ -118,7 +133,10 @@ fn run(Options { requests, format, measure_time }: Options) -> i32 {
 
     for hostname_in_query in &requests.inputs.domains {
         if local_host_hints.contains(hostname_in_query) {
-            eprintln!("warning: domain '{}' also exists in hosts file", hostname_in_query);
+            eprintln!(
+                "warning: domain '{}' also exists in hosts file",
+                hostname_in_query
+            );
         }
     }
 
@@ -141,7 +159,7 @@ fn run(Options { requests, format, measure_time }: Options) -> i32 {
                         continue;
                     }
 
-                    if ! should_show_opt {
+                    if !should_show_opt {
                         response.answers.retain(dns::Answer::is_standard);
                         response.authorities.retain(dns::Answer::is_standard);
                         response.additionals.retain(dns::Answer::is_standard);
@@ -163,37 +181,47 @@ fn run(Options { requests, format, measure_time }: Options) -> i32 {
     if format.print(responses, duration) {
         if errored {
             exits::NETWORK_ERROR
-        }
-        else {
+        } else {
             exits::SUCCESS
         }
-    }
-    else {
+    } else {
         exits::NO_SHORT_RESULTS
     }
 }
-
 
 /// Checks whether the options contain parameters that will cause dog to fail
 /// because the feature is disabled by exiting if so.
 #[allow(unused)]
 fn disabled_feature_check(options: &Options) {
-    use std::process::exit;
     use crate::connect::TransportType;
+    use std::process::exit;
 
     #[cfg(all(not(feature = "with_tls"), not(feature = "with_rustls_tls")))]
-    if options.requests.inputs.transport_types.contains(&TransportType::TLS) {
-        eprintln!("dog: Cannot use '--tls': This version of dog has been compiled without TLS support");
+    if options
+        .requests
+        .inputs
+        .transport_types
+        .contains(&TransportType::TLS)
+    {
+        eprintln!(
+            "dog: Cannot use '--tls': This version of dog has been compiled without TLS support"
+        );
         exit(exits::OPTIONS_ERROR);
     }
 
     #[cfg(all(not(feature = "with_https"), not(feature = "with_rustls_https")))]
-    if options.requests.inputs.transport_types.contains(&TransportType::HTTPS) {
-        eprintln!("dog: Cannot use '--https': This version of dog has been compiled without HTTPS support");
+    if options
+        .requests
+        .inputs
+        .transport_types
+        .contains(&TransportType::HTTPS)
+    {
+        eprintln!(
+            "dog: Cannot use '--https': This version of dog has been compiled without HTTPS support"
+        );
         exit(exits::OPTIONS_ERROR);
     }
 }
-
 
 /// The possible status numbers dog can exit with.
 mod exits {

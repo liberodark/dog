@@ -8,7 +8,6 @@
 #![warn(single_use_lifetimes)]
 #![warn(trivial_casts, trivial_numeric_casts)]
 #![warn(unused)]
-
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::len_without_is_empty)]
@@ -20,17 +19,14 @@
 #![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::wildcard_imports)]
-
 #![deny(clippy::cast_possible_truncation)]
 #![deny(clippy::cast_lossless)]
 #![deny(clippy::cast_possible_wrap)]
 #![deny(clippy::cast_sign_loss)]
 #![deny(unsafe_code)]
 
-
 //! The DNS crate is the ‘library’ part of dog. It implements the DNS
 //! protocol: creating and decoding packets from their byte structure.
-
 
 mod types;
 pub use self::types::*;
@@ -39,6 +35,6 @@ mod strings;
 pub use self::strings::Labels;
 
 mod wire;
-pub use self::wire::{Wire, WireError, MandatedLength};
+pub use self::wire::{MandatedLength, Wire, WireError};
 
 pub mod record;

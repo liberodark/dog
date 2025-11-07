@@ -2,7 +2,6 @@ use log::*;
 
 use crate::wire::*;
 
-
 /// A (an?) **HINFO** _(host information)_ record, which contains the CPU and
 /// OS information about a host.
 ///
@@ -16,7 +15,6 @@ use crate::wire::*;
 ///   Minimal-Sized Responses to DNS Queries That Have QTYPE=ANY (January 2019)
 #[derive(PartialEq, Debug)]
 pub struct HINFO {
-
     /// The CPU field, specifying the CPU type.
     pub cpu: Box<[u8]>,
 
@@ -30,7 +28,6 @@ impl Wire for HINFO {
 
     #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
-
         let cpu_length = c.read_u8()?;
         trace!("Parsed CPU length -> {:?}", cpu_length);
 
@@ -49,14 +46,18 @@ impl Wire for HINFO {
         if stated_length == length_after_labels {
             trace!("Length is correct");
             Ok(Self { cpu, os })
-        }
-        else {
-            warn!("Length is incorrect (stated length {:?}, cpu plus length {:?}", stated_length, length_after_labels);
-            Err(WireError::WrongLabelLength { stated_length, length_after_labels })
+        } else {
+            warn!(
+                "Length is incorrect (stated length {:?}, cpu plus length {:?}",
+                stated_length, length_after_labels
+            );
+            Err(WireError::WrongLabelLength {
+                stated_length,
+                length_after_labels,
+            })
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -66,47 +67,52 @@ mod test {
     #[test]
     fn parses() {
         let buf = &[
-            0x0e,  // cpu length
-            0x73, 0x6f, 0x6d, 0x65, 0x2d, 0x6b, 0x69, 0x6e, 0x64, 0x61, 0x2d,
-            0x63, 0x70, 0x75,  // cpu
-            0x0d,  // os length
-            0x73, 0x6f, 0x6d, 0x65, 0x2d, 0x6b, 0x69, 0x6e, 0x64, 0x61, 0x2d,
-            0x6f, 0x73,  // os
+            0x0e, // cpu length
+            0x73, 0x6f, 0x6d, 0x65, 0x2d, 0x6b, 0x69, 0x6e, 0x64, 0x61, 0x2d, 0x63, 0x70,
+            0x75, // cpu
+            0x0d, // os length
+            0x73, 0x6f, 0x6d, 0x65, 0x2d, 0x6b, 0x69, 0x6e, 0x64, 0x61, 0x2d, 0x6f,
+            0x73, // os
         ];
 
-        assert_eq!(HINFO::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   HINFO {
-                       cpu: Box::new(*b"some-kinda-cpu"),
-                       os: Box::new(*b"some-kinda-os"),
-                   });
+        assert_eq!(
+            HINFO::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            HINFO {
+                cpu: Box::new(*b"some-kinda-cpu"),
+                os: Box::new(*b"some-kinda-os"),
+            }
+        );
     }
 
     #[test]
     fn incorrect_record_length() {
         let buf = &[
-            0x03,  // cpu length
-            0x65, 0x66, 0x67,  // cpu
-            0x03,  // os length
-            0x68, 0x69, 0x70,  // os
+            0x03, // cpu length
+            0x65, 0x66, 0x67, // cpu
+            0x03, // os length
+            0x68, 0x69, 0x70, // os
         ];
 
-        assert_eq!(HINFO::read(6, &mut Cursor::new(buf)),
-                   Err(WireError::WrongLabelLength { stated_length: 6, length_after_labels: 8 }));
+        assert_eq!(
+            HINFO::read(6, &mut Cursor::new(buf)),
+            Err(WireError::WrongLabelLength {
+                stated_length: 6,
+                length_after_labels: 8
+            })
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(HINFO::read(0, &mut Cursor::new(&[])),
-                   Err(WireError::IO));
+        assert_eq!(HINFO::read(0, &mut Cursor::new(&[])), Err(WireError::IO));
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x14, 0x0A, 0x0B, 0x0C,  // 32-bit CPU
+            0x14, 0x0A, 0x0B, 0x0C, // 32-bit CPU
         ];
 
-        assert_eq!(HINFO::read(23, &mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(HINFO::read(23, &mut Cursor::new(buf)), Err(WireError::IO));
     }
 }

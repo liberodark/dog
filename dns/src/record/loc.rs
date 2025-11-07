@@ -4,7 +4,6 @@ use log::*;
 
 use crate::wire::*;
 
-
 /// A **LOC** _(location)_ record, which points to a location on Earth using
 /// its latitude, longitude, and altitude.
 ///
@@ -14,7 +13,6 @@ use crate::wire::*;
 ///   Location Information in the Domain Name System (January 1996)
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct LOC {
-
     /// The diameter of a sphere enclosing the entity at the location, as a
     /// measure of its size, measured in centimetres.
     pub size: Size,
@@ -92,7 +90,10 @@ impl Wire for LOC {
 
         if stated_length != 16 {
             let mandated_length = MandatedLength::Exactly(16);
-            return Err(WireError::WrongRecordLength { stated_length, mandated_length });
+            return Err(WireError::WrongRecordLength {
+                stated_length,
+                mandated_length,
+            });
         }
 
         let size_bits = c.read_u8()?;
@@ -118,13 +119,17 @@ impl Wire for LOC {
         trace!("Parsed altitude -> {:?} ({:})", altitude_num, altitude);
 
         Ok(Self {
-            size, horizontal_precision, vertical_precision, latitude, longitude, altitude,
+            size,
+            horizontal_precision,
+            vertical_precision,
+            latitude,
+            longitude,
+            altitude,
         })
     }
 }
 
 impl Size {
-
     /// Converts a number into the size it represents. To allow both small and
     /// large sizes, the input octet is split into two four-bit sizes, one the
     /// base, and one the power of ten exponent.
@@ -136,7 +141,6 @@ impl Size {
 }
 
 impl Position {
-
     /// Converts a number into the position it represents. The input number is
     /// measured in thousandths of an arcsecond (milliarcseconds), with 2^31
     /// as the equator or prime meridian.
@@ -150,8 +154,7 @@ impl Position {
         if input < (0x_8000_0000 - limit) || input > (0x_8000_0000 + limit) {
             // Input is out of range
             None
-        }
-        else if input >= 0x_8000_0000 {
+        } else if input >= 0x_8000_0000 {
             // Input is north or east, so de-relativise it and divide into segments
             input -= 0x_8000_0000;
             let milliarcseconds = input % 1000;
@@ -163,17 +166,28 @@ impl Position {
             let arcminutes = total_arcminutes % 60;
             let degrees = total_arcminutes / 60;
 
-            let direction = if vertical { Direction::North }
-                                   else { Direction::East };
+            let direction = if vertical {
+                Direction::North
+            } else {
+                Direction::East
+            };
 
-            Some(Self { degrees, arcminutes, arcseconds, milliarcseconds, direction })
-        }
-        else {
+            Some(Self {
+                degrees,
+                arcminutes,
+                arcseconds,
+                milliarcseconds,
+                direction,
+            })
+        } else {
             // Input is south or west, so do the calculations for
             let mut pos = Self::from_u32(input + (0x_8000_0000_u32 - input) * 2, vertical)?;
 
-            pos.direction = if vertical { Direction::South }
-                                   else { Direction::West };
+            pos.direction = if vertical {
+                Direction::South
+            } else {
+                Direction::West
+            };
             Some(pos)
         }
     }
@@ -182,13 +196,15 @@ impl Position {
 impl Altitude {
     fn from_u32(input: u32) -> Self {
         let mut input = i64::from(input);
-        input -= 10_000_000;  // 100,000m
+        input -= 10_000_000; // 100,000m
         let metres = input / 100;
         let centimetres = input % 100;
-        Self { metres, centimetres }
+        Self {
+            metres,
+            centimetres,
+        }
     }
 }
-
 
 impl fmt::Display for Size {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -198,10 +214,10 @@ impl fmt::Display for Size {
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}°{}′{}",
-            self.degrees,
-            self.arcminutes,
-            self.arcseconds,
+        write!(
+            f,
+            "{}°{}′{}",
+            self.degrees, self.arcminutes, self.arcseconds,
         )?;
 
         if self.milliarcseconds != 0 {
@@ -215,10 +231,10 @@ impl fmt::Display for Position {
 impl fmt::Display for Direction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::North  => write!(f, "N"),
-            Self::East   => write!(f, "E"),
-            Self::South  => write!(f, "S"),
-            Self::West   => write!(f, "W"),
+            Self::North => write!(f, "N"),
+            Self::East => write!(f, "E"),
+            Self::South => write!(f, "S"),
+            Self::West => write!(f, "W"),
         }
     }
 }
@@ -229,13 +245,11 @@ impl fmt::Display for Altitude {
         // spaces are already used to delimit segments in the record summary
         if self.centimetres == 0 {
             write!(f, "{}m", self.metres)
-        }
-        else {
+        } else {
             write!(f, "{}.{:02}m", self.metres, self.centimetres)
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -245,82 +259,99 @@ mod test {
     #[test]
     fn parses() {
         let buf = &[
-            0x00,  // version
-            0x32,  // size,
-            0x00,  // horizontal precision
-            0x00,  // vertical precision
-            0x8b, 0x0d, 0x2c, 0x8c,  // latitude
-            0x7f, 0xf8, 0xfc, 0xa5,  // longitude
-            0x00, 0x98, 0x96, 0x80,  // altitude
+            0x00, // version
+            0x32, // size,
+            0x00, // horizontal precision
+            0x00, // vertical precision
+            0x8b, 0x0d, 0x2c, 0x8c, // latitude
+            0x7f, 0xf8, 0xfc, 0xa5, // longitude
+            0x00, 0x98, 0x96, 0x80, // altitude
         ];
 
-        assert_eq!(LOC::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
-                   LOC {
-                       size: Size { base: 3, power_of_ten: 2 },
-                       horizontal_precision: 0,
-                       vertical_precision: 0,
-                       latitude:  Position::from_u32(0x_8b_0d_2c_8c, true),
-                       longitude: Position::from_u32(0x_7f_f8_fc_a5, false),
-                       altitude:  Altitude::from_u32(0x_00_98_96_80),
-                   });
+        assert_eq!(
+            LOC::read(buf.len() as _, &mut Cursor::new(buf)).unwrap(),
+            LOC {
+                size: Size {
+                    base: 3,
+                    power_of_ten: 2
+                },
+                horizontal_precision: 0,
+                vertical_precision: 0,
+                latitude: Position::from_u32(0x_8b_0d_2c_8c, true),
+                longitude: Position::from_u32(0x_7f_f8_fc_a5, false),
+                altitude: Altitude::from_u32(0x_00_98_96_80),
+            }
+        );
     }
 
     #[test]
     fn record_too_short() {
         let buf = &[
-            0x00,  // version
-            0x00,  // size
+            0x00, // version
+            0x00, // size
         ];
 
-        assert_eq!(LOC::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongRecordLength { stated_length: 2, mandated_length: MandatedLength::Exactly(16) }));
+        assert_eq!(
+            LOC::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongRecordLength {
+                stated_length: 2,
+                mandated_length: MandatedLength::Exactly(16)
+            })
+        );
     }
 
     #[test]
     fn record_too_long() {
         let buf = &[
-            0x00,  // version
-            0x32,  // size,
-            0x00,  // horizontal precision
-            0x00,  // vertical precision
-            0x8b, 0x0d, 0x2c, 0x8c,  // latitude
-            0x7f, 0xf8, 0xfc, 0xa5,  // longitude
-            0x00, 0x98, 0x96, 0x80,  // altitude
-            0x12, 0x34, 0x56,  // some other stuff
+            0x00, // version
+            0x32, // size,
+            0x00, // horizontal precision
+            0x00, // vertical precision
+            0x8b, 0x0d, 0x2c, 0x8c, // latitude
+            0x7f, 0xf8, 0xfc, 0xa5, // longitude
+            0x00, 0x98, 0x96, 0x80, // altitude
+            0x12, 0x34, 0x56, // some other stuff
         ];
 
-        assert_eq!(LOC::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongRecordLength { stated_length: 19, mandated_length: MandatedLength::Exactly(16) }));
+        assert_eq!(
+            LOC::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongRecordLength {
+                stated_length: 19,
+                mandated_length: MandatedLength::Exactly(16)
+            })
+        );
     }
 
     #[test]
     fn more_recent_version() {
         let buf = &[
-            0x80,  // version
-            0x12, 0x34, 0x56,  // some data in an unknown format
+            0x80, // version
+            0x12, 0x34, 0x56, // some data in an unknown format
         ];
 
-        assert_eq!(LOC::read(buf.len() as _, &mut Cursor::new(buf)),
-                   Err(WireError::WrongVersion { stated_version: 128, maximum_supported_version: 0 }));
+        assert_eq!(
+            LOC::read(buf.len() as _, &mut Cursor::new(buf)),
+            Err(WireError::WrongVersion {
+                stated_version: 128,
+                maximum_supported_version: 0
+            })
+        );
     }
 
     #[test]
     fn record_empty() {
-        assert_eq!(LOC::read(0, &mut Cursor::new(&[])),
-                   Err(WireError::IO));
+        assert_eq!(LOC::read(0, &mut Cursor::new(&[])), Err(WireError::IO));
     }
 
     #[test]
     fn buffer_ends_abruptly() {
         let buf = &[
-            0x00,  // version
+            0x00, // version
         ];
 
-        assert_eq!(LOC::read(16, &mut Cursor::new(buf)),
-                   Err(WireError::IO));
+        assert_eq!(LOC::read(16, &mut Cursor::new(buf)), Err(WireError::IO));
     }
 }
-
 
 #[cfg(test)]
 mod size_test {
@@ -329,29 +360,30 @@ mod size_test {
 
     #[test]
     fn zeroes() {
-        assert_eq!(Size::from_u8(0b_0000_0000).to_string(),
-                   String::from("0e0"));
+        assert_eq!(Size::from_u8(0b_0000_0000).to_string(), String::from("0e0"));
     }
 
     #[test]
     fn ones() {
-        assert_eq!(Size::from_u8(0b_0001_0001).to_string(),
-                   String::from("1e1"));
+        assert_eq!(Size::from_u8(0b_0001_0001).to_string(), String::from("1e1"));
     }
 
     #[test]
     fn schfourteen_teen() {
-        assert_eq!(Size::from_u8(0b_1110_0011).to_string(),
-                   String::from("14e3"));
+        assert_eq!(
+            Size::from_u8(0b_1110_0011).to_string(),
+            String::from("14e3")
+        );
     }
 
     #[test]
     fn ones_but_bits_this_time() {
-        assert_eq!(Size::from_u8(0b_1111_1111).to_string(),
-                   String::from("15e15"));
+        assert_eq!(
+            Size::from_u8(0b_1111_1111).to_string(),
+            String::from("15e15")
+        );
     }
 }
-
 
 #[cfg(test)]
 mod position_test {
@@ -362,105 +394,152 @@ mod position_test {
 
     #[test]
     fn meridian() {
-        assert_eq!(Position::from_u32(0x_8000_0000, false).unwrap().to_string(),
-                   String::from("0°0′0″ E"));
+        assert_eq!(
+            Position::from_u32(0x_8000_0000, false).unwrap().to_string(),
+            String::from("0°0′0″ E")
+        );
     }
 
     #[test]
     fn meridian_plus_one() {
-        assert_eq!(Position::from_u32(0x_8000_0000 + 1, false).unwrap().to_string(),
-                   String::from("0°0′0.001″ E"));
+        assert_eq!(
+            Position::from_u32(0x_8000_0000 + 1, false)
+                .unwrap()
+                .to_string(),
+            String::from("0°0′0.001″ E")
+        );
     }
 
     #[test]
     fn meridian_minus_one() {
-        assert_eq!(Position::from_u32(0x_8000_0000 - 1, false).unwrap().to_string(),
-                   String::from("0°0′0.001″ W"));
+        assert_eq!(
+            Position::from_u32(0x_8000_0000 - 1, false)
+                .unwrap()
+                .to_string(),
+            String::from("0°0′0.001″ W")
+        );
     }
 
     #[test]
     fn equator() {
-        assert_eq!(Position::from_u32(0x_8000_0000, true).unwrap().to_string(),
-                   String::from("0°0′0″ N"));
+        assert_eq!(
+            Position::from_u32(0x_8000_0000, true).unwrap().to_string(),
+            String::from("0°0′0″ N")
+        );
     }
 
     #[test]
     fn equator_plus_one() {
-        assert_eq!(Position::from_u32(0x_8000_0000 + 1, true).unwrap().to_string(),
-                   String::from("0°0′0.001″ N"));
+        assert_eq!(
+            Position::from_u32(0x_8000_0000 + 1, true)
+                .unwrap()
+                .to_string(),
+            String::from("0°0′0.001″ N")
+        );
     }
 
     #[test]
     fn equator_minus_one() {
-        assert_eq!(Position::from_u32(0x_8000_0000 - 1, true).unwrap().to_string(),
-                   String::from("0°0′0.001″ S"));
+        assert_eq!(
+            Position::from_u32(0x_8000_0000 - 1, true)
+                .unwrap()
+                .to_string(),
+            String::from("0°0′0.001″ S")
+        );
     }
 
     // arbitrary value tests
 
     #[test]
     fn some_latitude() {
-        assert_eq!(Position::from_u32(2332896396, true).unwrap().to_string(),
-                   String::from("51°30′12.748″ N"));
+        assert_eq!(
+            Position::from_u32(2332896396, true).unwrap().to_string(),
+            String::from("51°30′12.748″ N")
+        );
     }
 
     #[test]
     fn some_longitude() {
-        assert_eq!(Position::from_u32(2147024037, false).unwrap().to_string(),
-                   String::from("0°7′39.611″ W"));
+        assert_eq!(
+            Position::from_u32(2147024037, false).unwrap().to_string(),
+            String::from("0°7′39.611″ W")
+        );
     }
 
     // limit tests
 
     #[test]
     fn the_north_pole() {
-        assert_eq!(Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 90), true).unwrap().to_string(),
-                   String::from("90°0′0″ N"));
+        assert_eq!(
+            Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 90), true)
+                .unwrap()
+                .to_string(),
+            String::from("90°0′0″ N")
+        );
     }
 
     #[test]
     fn the_north_pole_plus_one() {
-        assert_eq!(Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 90) + 1, true),
-                   None);
+        assert_eq!(
+            Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 90) + 1, true),
+            None
+        );
     }
 
     #[test]
     fn the_south_pole() {
-        assert_eq!(Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 90), true).unwrap().to_string(),
-                   String::from("90°0′0″ S"));
+        assert_eq!(
+            Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 90), true)
+                .unwrap()
+                .to_string(),
+            String::from("90°0′0″ S")
+        );
     }
 
     #[test]
     fn the_south_pole_minus_one() {
-        assert_eq!(Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 90) - 1, true),
-                   None);
+        assert_eq!(
+            Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 90) - 1, true),
+            None
+        );
     }
 
     #[test]
     fn the_far_east() {
-        assert_eq!(Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 180), false).unwrap().to_string(),
-                   String::from("180°0′0″ E"));
+        assert_eq!(
+            Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 180), false)
+                .unwrap()
+                .to_string(),
+            String::from("180°0′0″ E")
+        );
     }
 
     #[test]
     fn the_far_east_plus_one() {
-        assert_eq!(Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 180) + 1, false),
-                   None);
+        assert_eq!(
+            Position::from_u32(0x8000_0000 + (1000 * 60 * 60 * 180) + 1, false),
+            None
+        );
     }
 
     #[test]
     fn the_far_west() {
-        assert_eq!(Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 180), false).unwrap().to_string(),
-                   String::from("180°0′0″ W"));
+        assert_eq!(
+            Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 180), false)
+                .unwrap()
+                .to_string(),
+            String::from("180°0′0″ W")
+        );
     }
 
     #[test]
     fn the_far_west_minus_one() {
-        assert_eq!(Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 180) - 1, false),
-                   None);
+        assert_eq!(
+            Position::from_u32(0x8000_0000 - (1000 * 60 * 60 * 180) - 1, false),
+            None
+        );
     }
 }
-
 
 #[cfg(test)]
 mod altitude_test {
@@ -469,25 +548,27 @@ mod altitude_test {
 
     #[test]
     fn base_level() {
-        assert_eq!(Altitude::from_u32(10000000).to_string(),
-                   String::from("0m"));
+        assert_eq!(Altitude::from_u32(10000000).to_string(), String::from("0m"));
     }
 
     #[test]
     fn up_high() {
-        assert_eq!(Altitude::from_u32(20000000).to_string(),
-                   String::from("100000m"));
+        assert_eq!(
+            Altitude::from_u32(20000000).to_string(),
+            String::from("100000m")
+        );
     }
 
     #[test]
     fn down_low() {
-        assert_eq!(Altitude::from_u32(0).to_string(),
-                   String::from("-100000m"));
+        assert_eq!(Altitude::from_u32(0).to_string(), String::from("-100000m"));
     }
 
     #[test]
     fn with_decimal() {
-        assert_eq!(Altitude::from_u32(50505050).to_string(),
-                   String::from("405050.50m"));
+        assert_eq!(
+            Altitude::from_u32(50505050).to_string(),
+            String::from("405050.50m")
+        );
     }
 }

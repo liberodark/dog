@@ -10,20 +10,17 @@
 #![warn(single_use_lifetimes)]
 #![warn(trivial_casts, trivial_numeric_casts)]
 #![warn(unused)]
-
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::pub_enum_variant_names)]
 #![allow(clippy::wildcard_imports)]
-
 #![deny(clippy::cast_possible_truncation)]
 #![deny(clippy::cast_lossless)]
 #![deny(clippy::cast_possible_wrap)]
 #![deny(clippy::cast_sign_loss)]
 #![deny(unsafe_code)]
-
 
 mod auto;
 pub use self::auto::AutoTransport;
@@ -48,7 +45,6 @@ pub use self::error::Error;
 
 /// The trait implemented by all transport types.
 pub trait Transport {
-
     /// Convert the request to bytes, send it over the network, wait for a
     /// response, deserialise it from bytes, and return it, asynchronously.
     ///

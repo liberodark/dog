@@ -1,12 +1,11 @@
 use std::convert::TryFrom;
-use std::net::TcpStream;
 use std::io::{Read, Write};
+use std::net::TcpStream;
 
 use log::*;
 
+use super::{Error, Transport};
 use dns::{Request, Response};
-use super::{Transport, Error};
-
 
 /// The **TCP transport**, which sends DNS wire data over a TCP stream.
 ///
@@ -21,24 +20,20 @@ pub struct TcpTransport {
 }
 
 impl TcpTransport {
-
     /// Creates a new TCP transport that connects to the given host.
     pub fn new(addr: String) -> Self {
         Self { addr }
     }
 }
 
-
 impl Transport for TcpTransport {
     fn send(&self, request: &Request) -> Result<Response, Error> {
         info!("Opening TCP stream");
-        let mut stream =
-            if self.addr.contains(':') {
-                TcpStream::connect(&*self.addr)?
-            }
-            else {
-                TcpStream::connect((&*self.addr, 53))?
-            };
+        let mut stream = if self.addr.contains(':') {
+            TcpStream::connect(&*self.addr)?
+        } else {
+            TcpStream::connect((&*self.addr, 53))?
+        };
         debug!("Opened");
 
         // The message is prepended with the length when sent over TCP,
@@ -46,7 +41,11 @@ impl Transport for TcpTransport {
         let mut bytes_to_send = request.to_bytes().expect("failed to serialise request");
         Self::prefix_with_length(&mut bytes_to_send);
 
-        info!("Sending {} bytes of data to {:?} over TCP", bytes_to_send.len(), self.addr);
+        info!(
+            "Sending {} bytes of data to {:?} over TCP",
+            bytes_to_send.len(),
+            self.addr
+        );
         let written_len = stream.write(&bytes_to_send)?;
         debug!("Wrote {} bytes", written_len);
 
@@ -57,7 +56,6 @@ impl Transport for TcpTransport {
 }
 
 impl TcpTransport {
-
     /// Mutate the given byte buffer, prefixing it with its own length as a
     /// big-endian `u16`.
     pub(crate) fn prefix_with_length(bytes: &mut Vec<u8>) {
@@ -87,8 +85,7 @@ impl TcpTransport {
         if read_len == 0 {
             warn!("Received no bytes!");
             return Err(Error::TruncatedResponse);
-        }
-        else if read_len == 1 {
+        } else if read_len == 1 {
             info!("Received one byte of data");
             let second_read_len = stream.read(&mut buf[1..])?;
             if second_read_len == 0 {
@@ -97,8 +94,7 @@ impl TcpTransport {
             }
 
             read_len += second_read_len;
-        }
-        else {
+        } else {
             info!("Received {} bytes of data", read_len);
         }
 
@@ -113,14 +109,17 @@ impl TcpTransport {
         while combined_buffer.len() < usize::from(total_len) {
             let mut extend_buf = [0; 4096];
             let extend_len = stream.read(&mut extend_buf[..])?;
-            info!("Received further {} bytes of data (of {})", extend_len, total_len);
+            info!(
+                "Received further {} bytes of data (of {})",
+                extend_len, total_len
+            );
 
             if read_len == 0 {
                 warn!("Read zero bytes!");
                 return Err(Error::TruncatedResponse);
             }
 
-            combined_buffer.extend(&extend_buf[0 .. extend_len]);
+            combined_buffer.extend(&extend_buf[0..extend_len]);
         }
 
         Ok(combined_buffer)

@@ -1,7 +1,6 @@
 /// Something that can go wrong making a DNS request.
 #[derive(Debug)]
 pub enum Error {
-
     /// The data in the response did not parse correctly from the DNS wire
     /// protocol format.
     WireError(dns::WireError),
@@ -34,7 +33,6 @@ pub enum Error {
     #[cfg(feature = "with_https")]
     WrongHttpStatus(u16, Option<String>),
 }
-
 
 // From impls
 

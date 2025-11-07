@@ -1,15 +1,13 @@
 //! Request generation based on the user’s input arguments.
 
 use crate::connect::TransportType;
-use crate::resolve::{ResolverType, ResolverLookupError};
+use crate::resolve::{ResolverLookupError, ResolverType};
 use crate::txid::TxidGenerator;
-
 
 /// All the information necessary to generate requests for one or more
 /// queries, nameservers, or transport types.
 #[derive(PartialEq, Debug)]
 pub struct RequestGenerator {
-
     /// The input parameter matrix.
     pub inputs: Inputs,
 
@@ -26,7 +24,6 @@ pub struct RequestGenerator {
 /// Which things the user has specified they want queried.
 #[derive(PartialEq, Debug, Default)]
 pub struct Inputs {
-
     /// The list of domain names to query.
     pub domains: Vec<dns::Labels>,
 
@@ -46,7 +43,6 @@ pub struct Inputs {
 /// Weird protocol options that are allowed by the spec but are not common.
 #[derive(PartialEq, Debug, Default, Copy, Clone)]
 pub struct ProtocolTweaks {
-
     /// Set the `AA` (Authoritative Answer) flag in the header of each request.
     pub set_authoritative_flag: bool,
 
@@ -63,7 +59,6 @@ pub struct ProtocolTweaks {
 /// Whether to send or display OPT packets.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum UseEDNS {
-
     /// Do not send an OPT query in requests, and do not display them.
     Disable,
 
@@ -76,20 +71,21 @@ pub enum UseEDNS {
     SendAndShow,
 }
 
-
 /// The entry type for `RequestGenerator`: a transport to send a request, and
 /// a list of one or more DNS queries to send over it, as determined by the
 /// search path in the resolver.
 pub type RequestSet = (Box<dyn dns_transport::Transport>, Vec<dns::Request>);
 
 impl RequestGenerator {
-
     /// Iterate through the inputs matrix, returning pairs of DNS request list
     /// and the details of the transport to send them down.
     pub fn generate(self) -> Result<Vec<RequestSet>, ResolverLookupError> {
         let mut requests = Vec::new();
 
-        let resolvers = self.inputs.resolver_types.into_iter()
+        let resolvers = self
+            .inputs
+            .resolver_types
+            .into_iter()
             .map(ResolverType::obtain)
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -98,7 +94,6 @@ impl RequestGenerator {
                 for qclass in self.inputs.classes.iter().copied() {
                     for resolver in &resolvers {
                         for transport_type in &self.inputs.transport_types {
-
                             let mut flags = dns::Flags::query();
                             self.protocol_tweaks.set_request_flags(&mut flags);
 
@@ -115,8 +110,17 @@ impl RequestGenerator {
                             let mut request_list = Vec::new();
                             for qname in resolver.name_list(domain) {
                                 let transaction_id = self.txid_generator.generate();
-                                let query = dns::Query { qname, qtype, qclass };
-                                let request = dns::Request { transaction_id, flags, query, additional: additional.clone() };
+                                let query = dns::Query {
+                                    qname,
+                                    qtype,
+                                    qclass,
+                                };
+                                let request = dns::Request {
+                                    transaction_id,
+                                    flags,
+                                    query,
+                                    additional: additional.clone(),
+                                };
                                 request_list.push(request);
                             }
                             requests.push((transport, request_list));
@@ -131,7 +135,6 @@ impl RequestGenerator {
 }
 
 impl UseEDNS {
-
     /// Whether the user wants to send OPT records.
     pub fn should_send(self) -> bool {
         self != Self::Disable
@@ -144,7 +147,6 @@ impl UseEDNS {
 }
 
 impl ProtocolTweaks {
-
     /// Sets fields in the DNS flags based on the user’s requested tweaks.
     pub fn set_request_flags(self, flags: &mut dns::Flags) {
         if self.set_authoritative_flag {
