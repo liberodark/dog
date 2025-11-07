@@ -26,7 +26,6 @@ impl Wire for CAA {
     const NAME: &'static str = "CAA";
     const RR_TYPE: u16 = 257;
 
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         // flags
         let flags = c.read_u8()?;

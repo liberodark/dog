@@ -18,7 +18,6 @@ impl Wire for OPENPGPKEY {
     const NAME: &'static str = "OPENPGPKEY";
     const RR_TYPE: u16 = 61;
 
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         if stated_length == 0 {
             let mandated_length = MandatedLength::AtLeast(1);

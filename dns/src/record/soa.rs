@@ -45,7 +45,6 @@ impl Wire for SOA {
     const RR_TYPE: u16 = 6;
 
     #[allow(clippy::similar_names)]
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let (mname, mname_length) = c.read_labels()?;
         trace!("Parsed mname -> {:?}", mname);

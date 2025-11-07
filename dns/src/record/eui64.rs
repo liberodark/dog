@@ -19,7 +19,6 @@ impl Wire for EUI64 {
     const NAME: &'static str = "EUI64";
     const RR_TYPE: u16 = 109;
 
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         if stated_length != 8 {
             warn!(

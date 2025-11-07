@@ -50,7 +50,6 @@ impl Request {
 
 impl Response {
     /// Reads bytes off of the given slice, parsing them into a response.
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, WireError> {
         info!("Parsing response");
         trace!("Bytes -> {:?}", bytes);
@@ -118,7 +117,6 @@ impl Response {
 impl Query {
     /// Reads bytes from the given cursor, and parses them into a query with
     /// the given domain name.
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn from_bytes(qname: Labels, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let qtype_number = c.read_u16::<BigEndian>()?;
         trace!("Read qtype number -> {:?}", qtype_number);
@@ -140,7 +138,6 @@ impl Query {
 impl Answer {
     /// Reads bytes from the given cursor, and parses them into an answer with
     /// the given domain name.
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn from_bytes(qname: Labels, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let qtype_number = c.read_u16::<BigEndian>()?;
         trace!("Read qtype number -> {:?}", qtype_number);
@@ -175,15 +172,11 @@ impl Answer {
 impl Record {
     /// Reads at most `len` bytes from the given curser, and parses them into
     /// a record structure depending on the type number, which has already been read.
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn from_bytes(
         record_type: RecordType,
         len: u16,
         c: &mut Cursor<&[u8]>,
     ) -> Result<Self, WireError> {
-        if cfg!(feature = "with_mutagen") {
-            warn!("Mutation is enabled!");
-        }
 
         macro_rules! read_record {
             ($record:tt) => {{

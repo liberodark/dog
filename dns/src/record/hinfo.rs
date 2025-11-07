@@ -26,7 +26,6 @@ impl Wire for HINFO {
     const NAME: &'static str = "HINFO";
     const RR_TYPE: u16 = 13;
 
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let cpu_length = c.read_u8()?;
         trace!("Parsed CPU length -> {:?}", cpu_length);

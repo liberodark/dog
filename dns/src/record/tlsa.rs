@@ -31,7 +31,6 @@ impl Wire for TLSA {
     const NAME: &'static str = "TLSA";
     const RR_TYPE: u16 = 52;
 
-    #[cfg_attr(feature = "with_mutagen", ::mutagen::mutate)]
     fn read(stated_length: u16, c: &mut Cursor<&[u8]>) -> Result<Self, WireError> {
         let certificate_usage = c.read_u8()?;
         trace!("Parsed certificate_usage -> {:?}", certificate_usage);
