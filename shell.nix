@@ -16,7 +16,7 @@ pkgs.mkShell {
   ];
 
   shellHook = ''
-    rustfmt --edition 2024 dns/src/record/*.rs dns/src/*.rs dns-transport/src/*.rs src/*.rs build.rs
+    rustfmt --edition 2024 dns/src/record/*.rs dns/src/*.rs dns/tests/*.rs dns-transport/src/*.rs src/*.rs build.rs
     cargo audit
   '';
 

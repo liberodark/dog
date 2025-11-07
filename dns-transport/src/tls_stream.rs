@@ -68,6 +68,6 @@ cfg_if::cfg_if! {
         }
 
     } else {
-        unreachable!("tls/https enabled but no tls implementation provided")
+        unreachable!("tls/https enabled but no tls implementation provided");
     }
 }
