@@ -56,9 +56,10 @@ serde_json = "1.0"
 # logging
 log = "0.4"
 
-# windows default nameserver determination
+# windows default nameserver determination and ANSI support
 [target.'cfg(windows)'.dependencies]
 ipconfig = { version = "0.3" }
+enable-ansi-support = "0.3"
 
 [dev-dependencies]
 pretty_assertions = "1.4"

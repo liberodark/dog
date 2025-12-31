@@ -250,6 +250,7 @@ dependencies = [
  "clap_complete",
  "dns",
  "dns-transport",
+ "enable-ansi-support",
  "ipconfig",
  "is-terminal",
  "log",
@@ -265,6 +266,15 @@ name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+
+[[package]]
+name = "enable-ansi-support"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea7457668b3da8a4b702f3d79e131aa3e81cd7e81cc95fb2d54fce9f182ecc77"
+dependencies = [
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "errno"
