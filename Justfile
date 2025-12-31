@@ -1,6 +1,6 @@
 all: build test xtests
 all-release: build-release test-release xtests-release
-all-quick: build-quick test-quick xtests-quick
+all-quick: build-quick test-quick xtests-options
 
 export DOG_DEBUG := ""
 
@@ -60,28 +60,23 @@ export DOG_DEBUG := ""
 
 # run extended tests
 @xtests *args:
-    specsheet xtests/{options,live,madns}/*.toml -shide {{args}} \
-        -O cmd.target.dog="${CARGO_TARGET_DIR:-../../target}/debug/dog"
+    DOG="${CARGO_TARGET_DIR:-target}/debug/dog" ./xtests/run.sh {{args}}
 
 # run extended tests (in release mode)
 @xtests-release *args:
-    specsheet xtests/{options,live,madns}/*.toml {{args}} \
-        -O cmd.target.dog="${CARGO_TARGET_DIR:-../../target}/release/dog"
+    DOG="${CARGO_TARGET_DIR:-target}/release/dog" ./xtests/run.sh {{args}}
 
-# run extended tests (omitting certain feature tests)
-@xtests-quick *args:
-    specsheet xtests/options/*.toml xtests/live/{basics,tcp}.toml -shide {{args}} \
-        -O cmd.target.dog="${CARGO_TARGET_DIR:-../../target}/debug/dog"
+# run only options tests (no network required)
+@xtests-options:
+    DOG="${CARGO_TARGET_DIR:-target}/debug/dog" ./xtests/run.sh options
 
-# run extended tests against a local madns instance
-@xtests-madns-local *args:
-    env MADNS_ARGS="@localhost:5301 --tcp" \
-        specsheet xtests/madns/*.toml -shide {{args}} \
-            -O cmd.target.dog="${CARGO_TARGET_DIR:-../../target}/debug/dog"
+# run only live tests
+@xtests-live:
+    DOG="${CARGO_TARGET_DIR:-target}/debug/dog" ./xtests/run.sh live
 
-# display the number of extended tests that get run
-@count-xtests:
-    grep -F '[[cmd]]' -R xtests | wc -l
+# run only madns tests
+@xtests-madns:
+    DOG="${CARGO_TARGET_DIR:-target}/debug/dog" ./xtests/run.sh madns
 
 
 #---------#
@@ -126,16 +121,22 @@ export DOG_DEBUG := ""
     command -v cargo-udeps >/dev/null || (echo "cargo-udeps not installed" && exit 1)
     cargo +nightly udeps
 
-# builds dog and runs extended tests with features disabled
-@feature-checks *args:
-    cargo build --no-default-features
-    specsheet xtests/features/none.toml -shide {{args}} \
-        -O cmd.target.dog="${CARGO_TARGET_DIR:-../../target}/debug/dog"
-
 # print versions of the necessary build tools
 @versions:
     rustc --version
     cargo --version
+
+
+#--------------#
+# completions  #
+#--------------#
+
+# generate shell completions
+@completions:
+    mkdir -p "${CARGO_TARGET_DIR:-target}/completions"
+    "${CARGO_TARGET_DIR:-target}/release/dog" --completions bash > "${CARGO_TARGET_DIR:-target}/completions/dog.bash"
+    "${CARGO_TARGET_DIR:-target}/release/dog" --completions zsh > "${CARGO_TARGET_DIR:-target}/completions/_dog"
+    "${CARGO_TARGET_DIR:-target}/release/dog" --completions fish > "${CARGO_TARGET_DIR:-target}/completions/dog.fish"
 
 
 #---------------#
@@ -161,15 +162,16 @@ export DOG_DEBUG := ""
 #-----------#
 
 # create a distributable package
-zip desc exe="dog":
+zip desc exe="dog": build-release man completions
     #!/usr/bin/env perl
     use Archive::Zip;
     -e 'target/release/{{ exe }}' || die 'Binary not built!';
     -e 'target/man/dog.1' || die 'Man page not built!';
+    -e 'target/completions/dog.bash' || die 'Completions not generated!';
     my $zip = Archive::Zip->new();
-    $zip->addFile('completions/dog.bash');
-    $zip->addFile('completions/dog.zsh');
-    $zip->addFile('completions/dog.fish');
+    $zip->addFile('target/completions/dog.bash', 'completions/dog.bash');
+    $zip->addFile('target/completions/_dog', 'completions/dog.zsh');
+    $zip->addFile('target/completions/dog.fish', 'completions/dog.fish');
     $zip->addFile('target/man/dog.1', 'man/dog.1');
     $zip->addFile('target/release/{{ exe }}', 'bin/{{ exe }}');
     $zip->writeToFileNamed('dog-{{ desc }}.zip') == AZ_OK || die 'Zip write error!';

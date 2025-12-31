@@ -1,1 +1,5 @@
-dog: Invalid options: Unrecognized option: 'wibble'
+error: unexpected argument '--wibble' found
+
+Usage: dog [OPTIONS] [ARGUMENTS]...
+
+For more information, try '--help'.

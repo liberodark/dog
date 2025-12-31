@@ -1,8 +1,11 @@
 //! Command-line option parsing.
 
-use std::ffi::OsStr;
 use std::fmt;
+use std::net::IpAddr;
 
+use clap::builder::{Styles, styling};
+use clap::{ArgAction, CommandFactory, Parser, ValueEnum};
+use clap_complete::{Generator, Shell};
 use log::*;
 
 use dns::record::RecordType;
@@ -13,6 +16,169 @@ use crate::output::{OutputFormat, TextFormat, UseColours};
 use crate::requests::{Inputs, ProtocolTweaks, RequestGenerator, UseEDNS};
 use crate::resolve::ResolverType;
 use crate::txid::TxidGenerator;
+
+const STYLES: Styles = Styles::styled()
+    .header(styling::AnsiColor::Yellow.on_default().underline())
+    .usage(styling::AnsiColor::Yellow.on_default().underline())
+    .literal(styling::AnsiColor::Green.on_default())
+    .placeholder(styling::AnsiColor::Cyan.on_default());
+
+const TEMPLATE: &str = "\x1b[1mdog\x1b[0m \x1b[1;32m●\x1b[0m command-line DNS client
+
+{usage-heading} {usage}
+
+\x1b[4;33mExamples:\x1b[0m
+  \x1b[32mdog\x1b[0m \x1b[36mexample.net\x1b[0m                          Query a domain using default settings
+  \x1b[32mdog\x1b[0m \x1b[36mexample.net MX\x1b[0m                       ...looking up MX records instead
+  \x1b[32mdog\x1b[0m \x1b[36mexample.net MX @1.1.1.1\x1b[0m              ...using a specific nameserver instead
+  \x1b[32mdog\x1b[0m \x1b[36mexample.net MX @1.1.1.1\x1b[0m \x1b[32m-T\x1b[0m          ...using TCP rather than UDP
+  \x1b[32mdog\x1b[0m \x1b[32m-q\x1b[0m \x1b[36mexample.net\x1b[0m \x1b[32m-t\x1b[0m \x1b[36mMX\x1b[0m \x1b[32m-n\x1b[0m \x1b[36m1.1.1.1\x1b[0m \x1b[32m-T\x1b[0m   As above, but using explicit arguments
+  \x1b[32mdog\x1b[0m \x1b[32m-x\x1b[0m \x1b[36m8.8.8.8\x1b[0m                           Reverse lookup for an IP address
+
+{all-args}";
+
+/// A command-line DNS client.
+#[derive(Parser, Debug)]
+#[command(name = "dog", version, about, styles = STYLES, help_template = TEMPLATE)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Args {
+    /// Host names or domain names to query, nameservers (@), types, or classes
+    #[arg(value_name = "ARGUMENTS")]
+    pub arguments: Vec<String>,
+
+    // === Query options ===
+    /// Host name or domain name to query
+    #[arg(
+        short = 'q',
+        long = "query",
+        value_name = "HOST",
+        help_heading = "Query options"
+    )]
+    pub queries: Vec<String>,
+
+    /// Type of the DNS record being queried (A, MX, NS...)
+    #[arg(
+        short = 't',
+        long = "type",
+        value_name = "TYPE",
+        help_heading = "Query options"
+    )]
+    pub types: Vec<String>,
+
+    /// Address of the nameserver to send packets to
+    #[arg(
+        short = 'n',
+        long = "nameserver",
+        value_name = "ADDR",
+        help_heading = "Query options"
+    )]
+    pub nameservers: Vec<String>,
+
+    /// Network class of the DNS record being queried (IN, CH, HS)
+    #[arg(long = "class", value_name = "CLASS", value_parser = parse_class, help_heading = "Query options")]
+    pub classes: Vec<QClass>,
+
+    /// Perform a reverse DNS lookup for an IP address
+    #[arg(
+        short = 'x',
+        long = "reverse",
+        value_name = "ADDR",
+        help_heading = "Query options"
+    )]
+    pub reverse: Vec<String>,
+
+    // === Sending options ===
+    /// Whether to OPT in to EDNS (disable, hide, show)
+    #[arg(
+        long = "edns",
+        value_name = "SETTING",
+        value_enum,
+        help_heading = "Sending options",
+        hide_possible_values = true
+    )]
+    pub edns: Option<EdnsSetting>,
+
+    /// Set the transaction ID to a specific value
+    #[arg(long = "txid", value_name = "NUMBER", value_parser = parse_txid, help_heading = "Sending options")]
+    pub txid: Option<u16>,
+
+    /// Set uncommon protocol-level tweaks
+    #[arg(short = 'Z', value_name = "TWEAKS", action = ArgAction::Append, help_heading = "Sending options")]
+    pub tweaks: Vec<String>,
+
+    // === Protocol options ===
+    /// Use the DNS protocol over UDP
+    #[arg(short = 'U', long = "udp", help_heading = "Protocol options")]
+    pub udp: bool,
+
+    /// Use the DNS protocol over TCP
+    #[arg(short = 'T', long = "tcp", help_heading = "Protocol options")]
+    pub tcp: bool,
+
+    /// Use the DNS-over-TLS protocol
+    #[arg(short = 'S', long = "tls", help_heading = "Protocol options")]
+    pub tls: bool,
+
+    /// Use the DNS-over-HTTPS protocol
+    #[arg(short = 'H', long = "https", help_heading = "Protocol options")]
+    pub https: bool,
+
+    // === Output options ===
+    /// Short mode: display nothing but the first result
+    #[arg(short = '1', long = "short", help_heading = "Output options")]
+    pub short: bool,
+
+    /// Display the output as JSON
+    #[arg(short = 'J', long = "json", help_heading = "Output options")]
+    pub json: bool,
+
+    /// When to colorise the output (always, automatic, never)
+    #[arg(
+        long = "color",
+        visible_alias = "colour",
+        value_name = "WHEN",
+        value_enum,
+        help_heading = "Output options",
+        hide_possible_values = true
+    )]
+    pub color: Option<ColorSetting>,
+
+    /// Do not format durations, display them as seconds
+    #[arg(long = "seconds", help_heading = "Output options")]
+    pub seconds: bool,
+
+    /// Print how long the response took to arrive
+    #[arg(long = "time", help_heading = "Output options")]
+    pub time: bool,
+
+    // === Completion generation ===
+    /// Generate shell completions
+    #[arg(long = "completions", value_name = "SHELL", value_enum, hide = true)]
+    pub completions: Option<Shell>,
+}
+
+/// EDNS setting values
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum EdnsSetting {
+    /// Do not send an OPT query
+    Disable,
+    /// Send an OPT query, but hide the result
+    Hide,
+    /// Send an OPT query and show the result
+    Show,
+}
+
+/// Color setting values
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum ColorSetting {
+    /// Always use colors
+    Always,
+    /// Use colors when printing to a terminal
+    #[default]
+    Automatic,
+    /// Never use colors
+    Never,
+}
 
 /// The command-line options used when running dog.
 #[derive(PartialEq, Debug)]
@@ -28,118 +194,49 @@ pub struct Options {
 }
 
 impl Options {
-    /// Parses and interprets a set of options from the user’s command-line
-    /// arguments.
-    ///
-    /// This returns an `Ok` set of options if successful and running
-    /// normally, a `Help` or `Version` variant if one of those options is
-    /// specified, or an error variant if there’s an invalid option or
-    /// inconsistency within the options after they were parsed.
-    #[allow(unused_results)]
-    pub fn getopts<C>(args: C) -> OptionsResult
-    where
-        C: IntoIterator,
-        C::Item: AsRef<OsStr>,
-    {
-        let mut opts = getopts::Options::new();
-
-        // Query options
-        opts.optmulti("q", "query", "Host name or domain name to query", "HOST");
-        opts.optmulti(
-            "t",
-            "type",
-            "Type of the DNS record being queried (A, MX, NS...)",
-            "TYPE",
-        );
-        opts.optmulti(
-            "n",
-            "nameserver",
-            "Address of the nameserver to send packets to",
-            "ADDR",
-        );
-        opts.optmulti(
-            "",
-            "class",
-            "Network class of the DNS record being queried (IN, CH, HS)",
-            "CLASS",
-        );
-        opts.optmulti(
-            "x",
-            "reverse",
-            "Perform a reverse DNS lookup for an IP address",
-            "ADDR",
-        );
-
-        // Sending options
-        opts.optopt(
-            "",
-            "edns",
-            "Whether to OPT in to EDNS (disable, hide, show)",
-            "SETTING",
-        );
-        opts.optopt(
-            "",
-            "txid",
-            "Set the transaction ID to a specific value",
-            "NUMBER",
-        );
-        opts.optmulti("Z", "", "Set uncommon protocol tweaks", "TWEAKS");
-
-        // Protocol options
-        opts.optflag("U", "udp", "Use the DNS protocol over UDP");
-        opts.optflag("T", "tcp", "Use the DNS protocol over TCP");
-        opts.optflag("S", "tls", "Use the DNS-over-TLS protocol");
-        opts.optflag("H", "https", "Use the DNS-over-HTTPS protocol");
-
-        // Output options
-        opts.optopt("", "color", "When to use terminal colors", "WHEN");
-        opts.optopt("", "colour", "When to use terminal colours", "WHEN");
-        opts.optflag("J", "json", "Display the output as JSON");
-        opts.optflag(
-            "",
-            "seconds",
-            "Do not format durations, display them as seconds",
-        );
-        opts.optflag(
-            "1",
-            "short",
-            "Short mode: display nothing but the first result",
-        );
-        opts.optflag("", "time", "Print how long the response took to arrive");
-
-        // Meta options
-        opts.optflag("v", "version", "Print version information");
-        opts.optflag("?", "help", "Print list of command-line options");
-
-        let matches = match opts.parse(args) {
-            Ok(m) => m,
-            Err(e) => return OptionsResult::InvalidOptionsFormat(e),
+    /// Parses and interprets a set of options from the user's command-line arguments.
+    pub fn parse() -> OptionsResult {
+        let args = match Args::try_parse() {
+            Ok(args) => args,
+            Err(e) => {
+                // Let clap print the error/help/version message
+                e.exit();
+            }
         };
 
-        let uc = UseColours::deduce(&matches);
+        // Handle completion generation
+        if let Some(shell) = args.completions {
+            print_completions(shell);
+            return OptionsResult::Exit(0);
+        }
 
-        if matches.opt_present("version") {
-            OptionsResult::Version(uc)
-        } else if matches.opt_present("help") {
-            OptionsResult::Help(HelpReason::Flag, uc)
-        } else {
-            match Self::deduce(matches) {
-                Ok(opts) => {
-                    if opts.requests.inputs.domains.is_empty() {
-                        OptionsResult::Help(HelpReason::NoDomains, uc)
-                    } else {
-                        OptionsResult::Ok(opts)
-                    }
+        Self::from_args(args)
+    }
+
+    /// Convert parsed Args into Options
+    fn from_args(args: Args) -> OptionsResult {
+        let use_colours = match args.color {
+            Some(ColorSetting::Always) => UseColours::Always,
+            Some(ColorSetting::Never) => UseColours::Never,
+            Some(ColorSetting::Automatic) | None => UseColours::Automatic,
+        };
+
+        match Self::deduce(args) {
+            Ok(opts) => {
+                if opts.requests.inputs.domains.is_empty() {
+                    OptionsResult::Help(use_colours)
+                } else {
+                    OptionsResult::Ok(opts)
                 }
-                Err(e) => OptionsResult::InvalidOptions(e),
             }
+            Err(e) => OptionsResult::InvalidOptions(e),
         }
     }
 
-    fn deduce(matches: getopts::Matches) -> Result<Self, OptionsError> {
-        let measure_time = matches.opt_present("time");
-        let format = OutputFormat::deduce(&matches);
-        let requests = RequestGenerator::deduce(matches)?;
+    fn deduce(args: Args) -> Result<Self, OptionsError> {
+        let measure_time = args.time;
+        let format = OutputFormat::deduce(&args);
+        let requests = RequestGenerator::deduce(args)?;
 
         Ok(Self {
             requests,
@@ -150,11 +247,11 @@ impl Options {
 }
 
 impl RequestGenerator {
-    fn deduce(matches: getopts::Matches) -> Result<Self, OptionsError> {
-        let edns = UseEDNS::deduce(&matches)?;
-        let txid_generator = TxidGenerator::deduce(&matches)?;
-        let protocol_tweaks = ProtocolTweaks::deduce(&matches)?;
-        let inputs = Inputs::deduce(matches)?;
+    fn deduce(args: Args) -> Result<Self, OptionsError> {
+        let edns = UseEDNS::deduce(&args);
+        let txid_generator = TxidGenerator::deduce(&args);
+        let protocol_tweaks = ProtocolTweaks::deduce(&args)?;
+        let inputs = Inputs::deduce(args)?;
 
         Ok(Self {
             inputs,
@@ -166,126 +263,98 @@ impl RequestGenerator {
 }
 
 impl Inputs {
-    fn deduce(matches: getopts::Matches) -> Result<Self, OptionsError> {
+    fn deduce(args: Args) -> Result<Self, OptionsError> {
         let mut inputs = Self::default();
-        inputs.load_transport_types(&matches);
-        inputs.load_named_args(&matches)?;
-        inputs.load_free_args(matches)?;
-        inputs.check_for_missing_nameserver()?;
-        inputs.load_fallbacks();
-        Ok(inputs)
-    }
 
-    fn load_transport_types(&mut self, matches: &getopts::Matches) {
-        if matches.opt_present("https") {
-            self.transport_types.push(TransportType::HTTPS);
+        // Load transport types
+        if args.https {
+            inputs.transport_types.push(TransportType::HTTPS);
+        }
+        if args.tls {
+            inputs.transport_types.push(TransportType::TLS);
+        }
+        if args.tcp {
+            inputs.transport_types.push(TransportType::TCP);
+        }
+        if args.udp {
+            inputs.transport_types.push(TransportType::UDP);
         }
 
-        if matches.opt_present("tls") {
-            self.transport_types.push(TransportType::TLS);
+        // Load named arguments
+        for domain in &args.queries {
+            inputs.add_domain(domain)?;
         }
 
-        if matches.opt_present("tcp") {
-            self.transport_types.push(TransportType::TCP);
-        }
-
-        if matches.opt_present("udp") {
-            self.transport_types.push(TransportType::UDP);
-        }
-    }
-
-    fn load_named_args(&mut self, matches: &getopts::Matches) -> Result<(), OptionsError> {
-        for domain in matches.opt_strs("query") {
-            self.add_domain(&domain)?;
-        }
-
-        for record_name in matches.opt_strs("type") {
+        for record_name in &args.types {
             if record_name.eq_ignore_ascii_case("OPT") {
                 return Err(OptionsError::QueryTypeOPT);
-            } else if let Some(record_type) = RecordType::from_type_name(&record_name) {
-                self.add_type(record_type);
+            } else if let Some(record_type) = RecordType::from_type_name(record_name) {
+                inputs.add_type(record_type);
             } else if let Ok(type_number) = record_name.parse::<u16>() {
-                self.record_types.push(RecordType::from(type_number));
+                inputs.record_types.push(RecordType::from(type_number));
             } else {
-                return Err(OptionsError::InvalidQueryType(record_name));
+                return Err(OptionsError::InvalidQueryType(record_name.clone()));
             }
         }
 
-        for ns in matches.opt_strs("nameserver") {
-            self.add_nameserver(&ns);
+        for ns in &args.nameservers {
+            inputs.add_nameserver(ns);
         }
 
-        for class_name in matches.opt_strs("class") {
-            if let Some(class) = parse_class_name(&class_name) {
-                self.add_class(class);
-            } else if let Ok(class_number) = class_name.parse() {
-                self.add_class(QClass::Other(class_number));
-            } else {
-                return Err(OptionsError::InvalidQueryClass(class_name));
-            }
-        }
+        inputs.classes.extend(args.classes);
 
         // Handle reverse lookups (-x)
-        for ip in matches.opt_strs("reverse") {
-            let ptr_name = ip_to_reverse_name(&ip).ok_or(OptionsError::InvalidIPAddress(ip))?;
-            self.add_domain(&ptr_name)?;
-            self.add_type(RecordType::PTR);
+        for ip in &args.reverse {
+            let ptr_name =
+                ip_to_reverse_name(ip).ok_or(OptionsError::InvalidIPAddress(ip.clone()))?;
+            inputs.add_domain(&ptr_name)?;
+            inputs.add_type(RecordType::PTR);
         }
 
-        Ok(())
-    }
-
-    fn load_free_args(&mut self, matches: getopts::Matches) -> Result<(), OptionsError> {
-        for argument in matches.free {
+        // Load free arguments
+        for argument in args.arguments {
             if let Some(nameserver) = argument.strip_prefix('@') {
                 trace!("Got nameserver -> {nameserver:?}");
-                self.add_nameserver(nameserver);
+                inputs.add_nameserver(nameserver);
             } else if is_constant_name(&argument) {
                 if argument.eq_ignore_ascii_case("OPT") {
                     return Err(OptionsError::QueryTypeOPT);
                 } else if let Some(class) = parse_class_name(&argument) {
                     trace!("Got qclass -> {:?}", &argument);
-                    self.add_class(class);
+                    inputs.add_class(class);
                 } else if let Some(record_type) = RecordType::from_type_name(&argument) {
                     trace!("Got qtype -> {:?}", &argument);
-                    self.add_type(record_type);
+                    inputs.add_type(record_type);
                 } else {
                     trace!("Got single-word domain -> {:?}", &argument);
-                    self.add_domain(&argument)?;
+                    inputs.add_domain(&argument)?;
                 }
             } else {
                 trace!("Got domain -> {:?}", &argument);
-                self.add_domain(&argument)?;
+                inputs.add_domain(&argument)?;
             }
         }
 
-        Ok(())
-    }
-
-    fn check_for_missing_nameserver(&self) -> Result<(), OptionsError> {
-        if self.resolver_types.is_empty() && self.transport_types == [TransportType::HTTPS] {
-            Err(OptionsError::MissingHttpsUrl)
-        } else {
-            Ok(())
-        }
-    }
-
-    fn load_fallbacks(&mut self) {
-        if self.record_types.is_empty() {
-            self.record_types.push(RecordType::A);
+        // Check for missing nameserver
+        if inputs.resolver_types.is_empty() && inputs.transport_types == [TransportType::HTTPS] {
+            return Err(OptionsError::MissingHttpsUrl);
         }
 
-        if self.classes.is_empty() {
-            self.classes.push(QClass::IN);
+        // Load fallbacks
+        if inputs.record_types.is_empty() {
+            inputs.record_types.push(RecordType::A);
+        }
+        if inputs.classes.is_empty() {
+            inputs.classes.push(QClass::IN);
+        }
+        if inputs.resolver_types.is_empty() {
+            inputs.resolver_types.push(ResolverType::SystemDefault);
+        }
+        if inputs.transport_types.is_empty() {
+            inputs.transport_types.push(TransportType::Automatic);
         }
 
-        if self.resolver_types.is_empty() {
-            self.resolver_types.push(ResolverType::SystemDefault);
-        }
-
-        if self.transport_types.is_empty() {
-            self.transport_types.push(TransportType::Automatic);
-        }
+        Ok(inputs)
     }
 
     fn add_domain(&mut self, input: &str) -> Result<(), OptionsError> {
@@ -335,13 +404,31 @@ fn parse_class_name(input: &str) -> Option<QClass> {
     }
 }
 
+/// Clap value parser for `QClass`
+fn parse_class(s: &str) -> Result<QClass, String> {
+    if let Some(class) = parse_class_name(s) {
+        Ok(class)
+    } else if let Ok(num) = s.parse::<u16>() {
+        Ok(QClass::Other(num))
+    } else {
+        Err(format!("Invalid class: {s}"))
+    }
+}
+
+/// Clap value parser for transaction ID (decimal or hex)
+fn parse_txid(s: &str) -> Result<u16, String> {
+    if let Some(hex_str) = s.strip_prefix("0x") {
+        u16::from_str_radix(hex_str, 16).map_err(|e| format!("Invalid hex txid: {e}"))
+    } else {
+        s.parse().map_err(|e| format!("Invalid txid: {e}"))
+    }
+}
+
 /// Converts an IP address to its reverse DNS name (PTR format).
 ///
 /// - IPv4: `8.8.8.8` → `8.8.8.8.in-addr.arpa`
 /// - IPv6: `2001:4860:4860::8888` → `8.8.8.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.0.6.8.4.1.0.0.2.ip6.arpa`
 fn ip_to_reverse_name(ip: &str) -> Option<String> {
-    use std::net::IpAddr;
-
     let addr: IpAddr = ip.parse().ok()?;
 
     match addr {
@@ -365,101 +452,52 @@ fn ip_to_reverse_name(ip: &str) -> Option<String> {
 }
 
 impl TxidGenerator {
-    fn deduce(matches: &getopts::Matches) -> Result<Self, OptionsError> {
-        if let Some(starting_txid) = matches.opt_str("txid") {
-            if let Some(start) = parse_dec_or_hex(&starting_txid) {
-                Ok(Self::Sequence(start))
-            } else {
-                Err(OptionsError::InvalidTxid(starting_txid))
-            }
+    fn deduce(args: &Args) -> Self {
+        if let Some(txid) = args.txid {
+            Self::Sequence(txid)
         } else {
-            Ok(Self::Random)
-        }
-    }
-}
-
-fn parse_dec_or_hex(input: &str) -> Option<u16> {
-    if let Some(hex_str) = input.strip_prefix("0x") {
-        match u16::from_str_radix(hex_str, 16) {
-            Ok(num) => Some(num),
-            Err(e) => {
-                warn!("Error parsing hex number: {e}");
-                None
-            }
-        }
-    } else {
-        match input.parse() {
-            Ok(num) => Some(num),
-            Err(e) => {
-                warn!("Error parsing number: {e}");
-                None
-            }
+            Self::Random
         }
     }
 }
 
 impl OutputFormat {
-    fn deduce(matches: &getopts::Matches) -> Self {
-        if matches.opt_present("short") {
-            let summary_format = TextFormat::deduce(matches);
-            Self::Short(summary_format)
-        } else if matches.opt_present("json") {
+    fn deduce(args: &Args) -> Self {
+        let text_format = TextFormat {
+            format_durations: !args.seconds,
+        };
+
+        if args.short {
+            Self::Short(text_format)
+        } else if args.json {
             Self::JSON
         } else {
-            let use_colours = UseColours::deduce(matches);
-            let summary_format = TextFormat::deduce(matches);
-            Self::Text(use_colours, summary_format)
+            let use_colours = match args.color {
+                Some(ColorSetting::Always) => UseColours::Always,
+                Some(ColorSetting::Never) => UseColours::Never,
+                Some(ColorSetting::Automatic) | None => UseColours::Automatic,
+            };
+            Self::Text(use_colours, text_format)
         }
-    }
-}
-
-impl UseColours {
-    fn deduce(matches: &getopts::Matches) -> Self {
-        match matches
-            .opt_str("color")
-            .or_else(|| matches.opt_str("colour"))
-            .unwrap_or_default()
-            .as_str()
-        {
-            "automatic" | "auto" | "" => Self::Automatic,
-            "always" | "yes" => Self::Always,
-            "never" | "no" => Self::Never,
-            otherwise => {
-                warn!("Unknown colour setting {otherwise:?}");
-                Self::Automatic
-            }
-        }
-    }
-}
-
-impl TextFormat {
-    fn deduce(matches: &getopts::Matches) -> Self {
-        let format_durations = !matches.opt_present("seconds");
-        Self { format_durations }
     }
 }
 
 impl UseEDNS {
-    fn deduce(matches: &getopts::Matches) -> Result<Self, OptionsError> {
-        if let Some(edns) = matches.opt_str("edns") {
-            match edns.as_str() {
-                "disable" | "off" => Ok(Self::Disable),
-                "hide" => Ok(Self::SendAndHide),
-                "show" => Ok(Self::SendAndShow),
-                oh => Err(OptionsError::InvalidEDNS(oh.into())),
-            }
-        } else {
-            Ok(Self::SendAndHide)
+    fn deduce(args: &Args) -> Self {
+        match args.edns {
+            Some(EdnsSetting::Disable) => Self::Disable,
+            Some(EdnsSetting::Show) => Self::SendAndShow,
+            Some(EdnsSetting::Hide) | None => Self::SendAndHide,
         }
     }
 }
 
 impl ProtocolTweaks {
-    fn deduce(matches: &getopts::Matches) -> Result<Self, OptionsError> {
+    fn deduce(args: &Args) -> Result<Self, OptionsError> {
         let mut tweaks = Self::default();
 
-        for tweak_str in matches.opt_strs("Z") {
-            match &*tweak_str {
+        for tweak_str in &args.tweaks {
+            match tweak_str.as_str() {
                 "aa" | "authoritative" => {
                     tweaks.set_authoritative_flag = true;
                 }
@@ -481,7 +519,6 @@ impl ProtocolTweaks {
                             }
                         }
                     }
-
                     return Err(OptionsError::InvalidTweak(otherwise.into()));
                 }
             }
@@ -491,46 +528,34 @@ impl ProtocolTweaks {
     }
 }
 
-/// The result of the `Options::getopts` function.
-#[derive(PartialEq, Debug)]
+/// Print shell completions to stdout
+fn print_completions<G: Generator>(generator: G) {
+    let mut cmd = Args::command();
+    clap_complete::generate(generator, &mut cmd, "dog", &mut std::io::stdout());
+}
+
+/// The result of option parsing.
+#[derive(Debug)]
 pub enum OptionsResult {
     /// The options were parsed successfully.
     Ok(Options),
 
-    /// There was an error (from `getopts`) parsing the arguments.
-    InvalidOptionsFormat(getopts::Fail),
-
     /// There was an error with the combination of options the user selected.
     InvalidOptions(OptionsError),
 
-    /// Can’t run any checks because there’s help to display!
-    Help(HelpReason, UseColours),
+    /// No domains were provided, show help message.
+    Help(UseColours),
 
-    /// One of the arguments was `--version`, to display the version number.
-    Version(UseColours),
-}
-
-/// The reason that help is being displayed. If it’s for the `--help` flag,
-/// then we shouldn’t return an error exit status.
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub enum HelpReason {
-    /// Help was requested with the `--help` flag.
-    Flag,
-
-    /// There were no domains being queried, so display help instead.
-    /// Unlike `dig`, we don’t implicitly search for the root domain.
-    NoDomains,
+    /// Exit immediately with the given code (for --completions)
+    Exit(i32),
 }
 
 /// Something wrong with the combination of options the user has picked.
 #[derive(PartialEq, Debug)]
 pub enum OptionsError {
     InvalidDomain(String),
-    InvalidEDNS(String),
     InvalidIPAddress(String),
     InvalidQueryType(String),
-    InvalidQueryClass(String),
-    InvalidTxid(String),
     InvalidTweak(String),
     QueryTypeOPT,
     MissingHttpsUrl,
@@ -540,11 +565,8 @@ impl fmt::Display for OptionsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidDomain(domain) => write!(f, "Invalid domain {domain:?}"),
-            Self::InvalidEDNS(edns) => write!(f, "Invalid EDNS setting {edns:?}"),
             Self::InvalidIPAddress(ip) => write!(f, "Invalid IP address {ip:?}"),
             Self::InvalidQueryType(qt) => write!(f, "Invalid query type {qt:?}"),
-            Self::InvalidQueryClass(qc) => write!(f, "Invalid query class {qc:?}"),
-            Self::InvalidTxid(txid) => write!(f, "Invalid transaction ID {txid:?}"),
             Self::InvalidTweak(tweak) => write!(f, "Invalid protocol tweak {tweak:?}"),
             Self::QueryTypeOPT => write!(f, "OPT request is sent by default (see -Z flag)"),
             Self::MissingHttpsUrl => {
@@ -557,13 +579,32 @@ impl fmt::Display for OptionsError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use dns::record::UnknownQtype;
+    use crate::connect::TransportType;
     use pretty_assertions::assert_eq;
+
+    /// Helper to parse args and get Options
+    fn parse_options(args: &[&str]) -> Result<Options, OptionsError> {
+        let mut full_args = vec!["dog"];
+        full_args.extend(args);
+        let parsed = Args::try_parse_from(full_args).expect("clap parsing failed");
+        Options::from_args(parsed).into_result()
+    }
+
+    impl OptionsResult {
+        fn into_result(self) -> Result<Options, OptionsError> {
+            match self {
+                Self::Ok(opts) => Ok(opts),
+                Self::InvalidOptions(e) => Err(e),
+                Self::Help(_) => panic!("Got Help"),
+                Self::Exit(_) => panic!("Got Exit"),
+            }
+        }
+    }
 
     impl Inputs {
         fn fallbacks() -> Self {
-            Inputs {
-                domains: vec![ /* No domains by default */ ],
+            Self {
+                domains: vec![],
                 record_types: vec![RecordType::A],
                 classes: vec![QClass::IN],
                 resolver_types: vec![ResolverType::SystemDefault],
@@ -572,95 +613,15 @@ mod test {
         }
     }
 
-    impl OptionsResult {
-        fn unwrap(self) -> Options {
-            match self {
-                Self::Ok(o) => o,
-                _ => panic!("{self:?}"),
-            }
-        }
-    }
-
-    // help tests
+    // === Basic parsing tests ===
 
     #[test]
-    fn help() {
-        assert_eq!(
-            Options::getopts(&["--help"]),
-            OptionsResult::Help(HelpReason::Flag, UseColours::Automatic)
-        );
-    }
-
-    #[test]
-    fn help_no_colour() {
-        assert_eq!(
-            Options::getopts(&["--help", "--colour=never"]),
-            OptionsResult::Help(HelpReason::Flag, UseColours::Never)
-        );
-    }
-
-    #[test]
-    fn version() {
-        assert_eq!(
-            Options::getopts(&["--version"]),
-            OptionsResult::Version(UseColours::Automatic)
-        );
-    }
-
-    #[test]
-    fn version_yes_color() {
-        assert_eq!(
-            Options::getopts(&["--version", "--color", "always"]),
-            OptionsResult::Version(UseColours::Always)
-        );
-    }
-
-    #[test]
-    fn fail() {
-        assert_eq!(
-            Options::getopts(&["--pear"]),
-            OptionsResult::InvalidOptionsFormat(getopts::Fail::UnrecognizedOption("pear".into()))
-        );
-    }
-
-    #[test]
-    fn empty() {
-        let nothing: Vec<&str> = vec![];
-        assert_eq!(
-            Options::getopts(nothing),
-            OptionsResult::Help(HelpReason::NoDomains, UseColours::Automatic)
-        );
-    }
-
-    #[test]
-    fn an_unrelated_argument() {
-        assert_eq!(
-            Options::getopts(&["--time"]),
-            OptionsResult::Help(HelpReason::NoDomains, UseColours::Automatic)
-        );
-    }
-
-    // query tests
-
-    #[test]
-    fn just_domain() {
-        let options = Options::getopts(&["lookup.dog"]).unwrap();
+    fn just_a_domain() {
+        let options = parse_options(&["dom.ain"]).unwrap();
         assert_eq!(
             options.requests.inputs,
             Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                ..Inputs::fallbacks()
-            }
-        );
-    }
-
-    #[test]
-    fn just_named_domain() {
-        let options = Options::getopts(&["-q", "lookup.dog"]).unwrap();
-        assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
+                domains: vec![Labels::encode("dom.ain").unwrap()],
                 ..Inputs::fallbacks()
             }
         );
@@ -668,55 +629,12 @@ mod test {
 
     #[test]
     fn domain_and_type() {
-        let options = Options::getopts(&["lookup.dog", "SOA"]).unwrap();
+        let options = parse_options(&["dom.ain", "MX"]).unwrap();
         assert_eq!(
             options.requests.inputs,
             Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                record_types: vec![RecordType::SOA],
-                ..Inputs::fallbacks()
-            }
-        );
-    }
-
-    #[test]
-    fn domain_and_type_lowercase() {
-        let options = Options::getopts(&["lookup.dog", "soa"]).unwrap();
-        assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                record_types: vec![RecordType::SOA],
-                ..Inputs::fallbacks()
-            }
-        );
-    }
-
-    #[test]
-    fn domain_and_other_type() {
-        let options = Options::getopts(&["lookup.dog", "any"]).unwrap();
-        assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                record_types: vec![RecordType::Other(
-                    UnknownQtype::from_type_name("ANY").unwrap()
-                )],
-                ..Inputs::fallbacks()
-            }
-        );
-    }
-
-    #[test]
-    fn domain_and_single_domain() {
-        let options = Options::getopts(&["lookup.dog", "mixes"]).unwrap();
-        assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![
-                    Labels::encode("lookup.dog").unwrap(),
-                    Labels::encode("mixes").unwrap()
-                ],
+                domains: vec![Labels::encode("dom.ain").unwrap()],
+                record_types: vec![RecordType::MX],
                 ..Inputs::fallbacks()
             }
         );
@@ -724,11 +642,11 @@ mod test {
 
     #[test]
     fn domain_and_nameserver() {
-        let options = Options::getopts(&["lookup.dog", "@1.1.1.1"]).unwrap();
+        let options = parse_options(&["@1.1.1.1", "dom.ain"]).unwrap();
         assert_eq!(
             options.requests.inputs,
             Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
+                domains: vec![Labels::encode("dom.ain").unwrap()],
                 resolver_types: vec![ResolverType::Specific("1.1.1.1".into())],
                 ..Inputs::fallbacks()
             }
@@ -737,222 +655,159 @@ mod test {
 
     #[test]
     fn domain_and_class() {
-        let options = Options::getopts(&["lookup.dog", "CH"]).unwrap();
+        let options = parse_options(&["CH", "dom.ain"]).unwrap();
         assert_eq!(
             options.requests.inputs,
             Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
+                domains: vec![Labels::encode("dom.ain").unwrap()],
                 classes: vec![QClass::CH],
                 ..Inputs::fallbacks()
             }
         );
     }
 
+    // === Explicit argument tests ===
+
     #[test]
-    fn domain_and_class_lowercase() {
-        let options = Options::getopts(&["lookup.dog", "ch"]).unwrap();
+    fn explicit_query() {
+        let options = parse_options(&["-q", "dom.ain"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::CH],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.domains,
+            vec![Labels::encode("dom.ain").unwrap()]
         );
     }
 
     #[test]
-    fn all_free() {
-        let options = Options::getopts(&["lookup.dog", "CH", "NS", "@1.1.1.1"]).unwrap();
+    fn explicit_type() {
+        let options = parse_options(&["-t", "MX", "dom.ain"]).unwrap();
+        assert_eq!(options.requests.inputs.record_types, vec![RecordType::MX]);
+    }
+
+    #[test]
+    fn explicit_nameserver() {
+        let options = parse_options(&["-n", "1.1.1.1", "dom.ain"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::CH],
-                record_types: vec![RecordType::NS],
-                resolver_types: vec![ResolverType::Specific("1.1.1.1".into())],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.resolver_types,
+            vec![ResolverType::Specific("1.1.1.1".into())]
         );
     }
 
     #[test]
-    fn all_parameters() {
-        let options = Options::getopts(&[
-            "-q",
-            "lookup.dog",
-            "--class",
-            "CH",
-            "--type",
-            "SOA",
-            "--nameserver",
-            "1.1.1.1",
-        ])
-        .unwrap();
+    fn explicit_class() {
+        let options = parse_options(&["--class", "HS", "dom.ain"]).unwrap();
+        assert_eq!(options.requests.inputs.classes, vec![QClass::HS]);
+    }
+
+    #[test]
+    fn numeric_type() {
+        let options = parse_options(&["dom.ain", "-t", "33"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::CH],
-                record_types: vec![RecordType::SOA],
-                resolver_types: vec![ResolverType::Specific("1.1.1.1".into())],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.record_types,
+            vec![RecordType::from(33)]
         );
     }
 
     #[test]
-    fn all_parameters_lowercase() {
-        let options = Options::getopts(&[
-            "-q",
-            "lookup.dog",
-            "--class",
-            "ch",
-            "--type",
-            "soa",
-            "--nameserver",
-            "1.1.1.1",
-        ])
-        .unwrap();
+    fn numeric_class() {
+        let options = parse_options(&["dom.ain", "--class", "4"]).unwrap();
+        assert_eq!(options.requests.inputs.classes, vec![QClass::Other(4)]);
+    }
+
+    // === Transport tests ===
+
+    #[test]
+    fn udp_transport() {
+        let options = parse_options(&["dom.ain", "--udp"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::CH],
-                record_types: vec![RecordType::SOA],
-                resolver_types: vec![ResolverType::Specific("1.1.1.1".into())],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.transport_types,
+            vec![TransportType::UDP]
         );
     }
 
     #[test]
-    fn two_types() {
-        let options =
-            Options::getopts(&["-q", "lookup.dog", "--type", "SRV", "--type", "AAAA"]).unwrap();
+    fn tcp_transport() {
+        let options = parse_options(&["dom.ain", "--tcp"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                record_types: vec![RecordType::SRV, RecordType::AAAA],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.transport_types,
+            vec![TransportType::TCP]
         );
     }
 
     #[test]
-    fn two_classes() {
-        let options =
-            Options::getopts(&["-q", "lookup.dog", "--class", "IN", "--class", "CH"]).unwrap();
+    fn all_transports() {
+        let options = parse_options(&["dom.ain", "-H", "-S", "-T", "-U"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::IN, QClass::CH],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.transport_types,
+            vec![
+                TransportType::HTTPS,
+                TransportType::TLS,
+                TransportType::TCP,
+                TransportType::UDP
+            ]
         );
     }
 
+    // === Reverse DNS tests ===
+
     #[test]
-    fn all_mixed_1() {
-        let options = Options::getopts(&[
-            "lookup.dog",
-            "--class",
-            "CH",
-            "SOA",
-            "--nameserver",
-            "1.1.1.1",
-        ])
-        .unwrap();
+    fn reverse_flag_ipv4() {
+        let options = parse_options(&["-x", "8.8.8.8"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::CH],
-                record_types: vec![RecordType::SOA],
-                resolver_types: vec![ResolverType::Specific("1.1.1.1".into())],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.domains,
+            vec![Labels::encode("8.8.8.8.in-addr.arpa").unwrap()]
         );
+        assert_eq!(options.requests.inputs.record_types, vec![RecordType::PTR]);
     }
 
     #[test]
-    fn all_mixed_2() {
-        let options =
-            Options::getopts(&["CH", "SOA", "MX", "IN", "-q", "lookup.dog", "--class", "HS"])
-                .unwrap();
+    fn reverse_flag_ipv6() {
+        let options = parse_options(&["-x", "2001:4860:4860::8888"]).unwrap();
         assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                classes: vec![QClass::HS, QClass::CH, QClass::IN],
-                record_types: vec![RecordType::SOA, RecordType::MX],
-                ..Inputs::fallbacks()
-            }
+            options.requests.inputs.domains,
+            vec![
+                Labels::encode(
+                    "8.8.8.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.0.6.8.4.1.0.0.2.ip6.arpa"
+                )
+                .unwrap()
+            ]
         );
     }
 
-    #[test]
-    fn all_mixed_3() {
-        let options = Options::getopts(&[
-            "lookup.dog",
-            "--nameserver",
-            "1.1.1.1",
-            "--nameserver",
-            "1.0.0.1",
-        ])
-        .unwrap();
-        assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("lookup.dog").unwrap()],
-                resolver_types: vec![
-                    ResolverType::Specific("1.1.1.1".into()),
-                    ResolverType::Specific("1.0.0.1".into()),
-                ],
-                ..Inputs::fallbacks()
-            }
-        );
-    }
+    // === EDNS and tweaks tests ===
 
     #[test]
-    fn explicit_numerics() {
-        let options = Options::getopts(&["11", "--class", "22", "--type", "33"]).unwrap();
-        assert_eq!(
-            options.requests.inputs,
-            Inputs {
-                domains: vec![Labels::encode("11").unwrap()],
-                classes: vec![QClass::Other(22)],
-                record_types: vec![RecordType::from(33)],
-                ..Inputs::fallbacks()
-            }
-        );
-    }
-
-    #[test]
-    fn edns_and_tweaks() {
-        let options = Options::getopts(&["dom.ain", "--edns", "show", "-Z", "authentic"]).unwrap();
+    fn edns_show() {
+        let options = parse_options(&["dom.ain", "--edns", "show"]).unwrap();
         assert_eq!(options.requests.edns, UseEDNS::SendAndShow);
-        assert_eq!(options.requests.protocol_tweaks.set_authentic_flag, true);
     }
 
     #[test]
-    fn two_more_tweaks() {
-        let options = Options::getopts(&["dom.ain", "-Z", "aa", "-Z", "cd"]).unwrap();
-        assert_eq!(
-            options.requests.protocol_tweaks.set_authoritative_flag,
-            true
-        );
-        assert_eq!(
-            options.requests.protocol_tweaks.set_checking_disabled_flag,
-            true
-        );
+    fn edns_disable() {
+        let options = parse_options(&["dom.ain", "--edns", "disable"]).unwrap();
+        assert_eq!(options.requests.edns, UseEDNS::Disable);
     }
 
     #[test]
-    fn udp_size() {
-        let options = Options::getopts(&["dom.ain", "-Z", "bufsize=4096"]).unwrap();
+    fn tweak_authentic() {
+        let options = parse_options(&["dom.ain", "-Z", "ad"]).unwrap();
+        assert!(options.requests.protocol_tweaks.set_authentic_flag);
+    }
+
+    #[test]
+    fn tweak_authoritative() {
+        let options = parse_options(&["dom.ain", "-Z", "aa"]).unwrap();
+        assert!(options.requests.protocol_tweaks.set_authoritative_flag);
+    }
+
+    #[test]
+    fn tweak_checking_disabled() {
+        let options = parse_options(&["dom.ain", "-Z", "cd"]).unwrap();
+        assert!(options.requests.protocol_tweaks.set_checking_disabled_flag);
+    }
+
+    #[test]
+    fn tweak_bufsize() {
+        let options = parse_options(&["dom.ain", "-Z", "bufsize=4096"]).unwrap();
         assert_eq!(
             options.requests.protocol_tweaks.udp_payload_size,
             Some(4096)
@@ -960,32 +815,47 @@ mod test {
     }
 
     #[test]
-    fn short_mode() {
-        let tf = TextFormat {
-            format_durations: true,
-        };
-        let options = Options::getopts(&["dom.ain", "--short"]).unwrap();
-        assert_eq!(options.format, OutputFormat::Short(tf));
+    fn multiple_tweaks() {
+        let options = parse_options(&["dom.ain", "-Z", "aa", "-Z", "cd"]).unwrap();
+        assert!(options.requests.protocol_tweaks.set_authoritative_flag);
+        assert!(options.requests.protocol_tweaks.set_checking_disabled_flag);
     }
 
+    // === Output format tests ===
+
     #[test]
-    fn short_mode_seconds() {
-        let tf = TextFormat {
-            format_durations: false,
-        };
-        let options = Options::getopts(&["dom.ain", "--short", "--seconds"]).unwrap();
-        assert_eq!(options.format, OutputFormat::Short(tf));
+    fn short_mode() {
+        let options = parse_options(&["dom.ain", "--short"]).unwrap();
+        assert!(matches!(options.format, OutputFormat::Short(_)));
     }
 
     #[test]
     fn json_output() {
-        let options = Options::getopts(&["dom.ain", "--json"]).unwrap();
+        let options = parse_options(&["dom.ain", "--json"]).unwrap();
         assert_eq!(options.format, OutputFormat::JSON);
     }
 
     #[test]
+    fn measure_time() {
+        let options = parse_options(&["dom.ain", "--time"]).unwrap();
+        assert!(options.measure_time);
+    }
+
+    #[test]
+    fn format_seconds() {
+        let options = parse_options(&["dom.ain", "--short", "--seconds"]).unwrap();
+        if let OutputFormat::Short(tf) = options.format {
+            assert!(!tf.format_durations);
+        } else {
+            panic!("Expected Short format");
+        }
+    }
+
+    // === TXID tests ===
+
+    #[test]
     fn specific_txid() {
-        let options = Options::getopts(&["dom.ain", "--txid", "1234"]).unwrap();
+        let options = parse_options(&["dom.ain", "--txid", "1234"]).unwrap();
         assert_eq!(
             options.requests.txid_generator,
             TxidGenerator::Sequence(1234)
@@ -993,156 +863,89 @@ mod test {
     }
 
     #[test]
-    fn all_transport_types() {
-        use crate::connect::TransportType::*;
-
-        let options = Options::getopts(&["dom.ain", "--https", "--tls", "--tcp", "--udp"]).unwrap();
+    fn specific_txid_hex() {
+        let options = parse_options(&["dom.ain", "--txid", "0xABCD"]).unwrap();
         assert_eq!(
-            options.requests.inputs.transport_types,
-            vec![HTTPS, TLS, TCP, UDP]
+            options.requests.txid_generator,
+            TxidGenerator::Sequence(0xABCD)
         );
     }
 
-    // invalid options tests
+    // === Error tests (not handled by clap) ===
 
     #[test]
-    fn invalid_named_class() {
+    fn invalid_query_type() {
+        let result = parse_options(&["dom.ain", "-t", "INVALID"]);
         assert_eq!(
-            Options::getopts(&["lookup.dog", "--class", "tubes"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidQueryClass("tubes".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_named_class_too_big() {
-        assert_eq!(
-            Options::getopts(&["lookup.dog", "--class", "999999"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidQueryClass("999999".into()))
+            result,
+            Err(OptionsError::InvalidQueryType("INVALID".into()))
         );
     }
 
     #[test]
-    fn invalid_named_type() {
+    fn invalid_query_type_too_big() {
+        let result = parse_options(&["dom.ain", "-t", "999999"]);
+        assert_eq!(result, Err(OptionsError::InvalidQueryType("999999".into())));
+    }
+
+    #[test]
+    fn invalid_tweak() {
+        let result = parse_options(&["dom.ain", "-Z", "invalid"]);
+        assert_eq!(result, Err(OptionsError::InvalidTweak("invalid".into())));
+    }
+
+    #[test]
+    fn invalid_bufsize() {
+        let result = parse_options(&["dom.ain", "-Z", "bufsize=notanumber"]);
         assert_eq!(
-            Options::getopts(&["lookup.dog", "--type", "tubes"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidQueryType("tubes".into()))
+            result,
+            Err(OptionsError::InvalidTweak("bufsize=notanumber".into()))
         );
     }
 
     #[test]
-    fn invalid_named_type_too_big() {
+    fn invalid_bufsize_too_big() {
+        let result = parse_options(&["dom.ain", "-Z", "bufsize=999999999"]);
         assert_eq!(
-            Options::getopts(&["lookup.dog", "--type", "999999"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidQueryType("999999".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_txid() {
-        assert_eq!(
-            Options::getopts(&["lookup.dog", "--txid=0x10000"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidTxid("0x10000".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_edns() {
-        assert_eq!(
-            Options::getopts(&["--edns=yep"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidEDNS("yep".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_tweaks() {
-        assert_eq!(
-            Options::getopts(&["-Zsleep"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidTweak("sleep".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_udp_size() {
-        assert_eq!(
-            Options::getopts(&["-Z", "bufsize=null"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidTweak("bufsize=null".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_udp_size_size() {
-        assert_eq!(
-            Options::getopts(&["-Z", "bufsize=999999999"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidTweak("bufsize=999999999".into()))
-        );
-    }
-
-    #[test]
-    fn invalid_udp_size_missing() {
-        assert_eq!(
-            Options::getopts(&["-Z", "bufsize="]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidTweak("bufsize=".into()))
+            result,
+            Err(OptionsError::InvalidTweak("bufsize=999999999".into()))
         );
     }
 
     #[test]
     fn missing_https_url() {
-        assert_eq!(
-            Options::getopts(&["--https", "lookup.dog"]),
-            OptionsResult::InvalidOptions(OptionsError::MissingHttpsUrl)
-        );
-    }
-
-    // opt tests
-
-    #[test]
-    fn opt() {
-        assert_eq!(
-            Options::getopts(&["OPT", "lookup.dog"]),
-            OptionsResult::InvalidOptions(OptionsError::QueryTypeOPT)
-        );
+        let result = parse_options(&["--https", "dom.ain"]);
+        assert_eq!(result, Err(OptionsError::MissingHttpsUrl));
     }
 
     #[test]
-    fn opt_lowercase() {
-        assert_eq!(
-            Options::getopts(&["opt", "lookup.dog"]),
-            OptionsResult::InvalidOptions(OptionsError::QueryTypeOPT)
-        );
+    fn opt_query_type() {
+        let result = parse_options(&["OPT", "dom.ain"]);
+        assert_eq!(result, Err(OptionsError::QueryTypeOPT));
     }
 
     #[test]
-    fn opt_arg() {
-        assert_eq!(
-            Options::getopts(&["-t", "OPT", "lookup.dog"]),
-            OptionsResult::InvalidOptions(OptionsError::QueryTypeOPT)
-        );
+    fn opt_query_type_lowercase() {
+        let result = parse_options(&["opt", "dom.ain"]);
+        assert_eq!(result, Err(OptionsError::QueryTypeOPT));
     }
 
     #[test]
-    fn opt_arg_lowercase() {
+    fn opt_explicit_type() {
+        let result = parse_options(&["-t", "OPT", "dom.ain"]);
+        assert_eq!(result, Err(OptionsError::QueryTypeOPT));
+    }
+
+    #[test]
+    fn reverse_invalid_ip() {
+        let result = parse_options(&["-x", "not-an-ip"]);
         assert_eq!(
-            Options::getopts(&["-t", "opt", "lookup.dog"]),
-            OptionsResult::InvalidOptions(OptionsError::QueryTypeOPT)
+            result,
+            Err(OptionsError::InvalidIPAddress("not-an-ip".into()))
         );
     }
 
-    // txid tests
-
-    #[test]
-    fn number_parsing() {
-        assert_eq!(parse_dec_or_hex("1234"), Some(1234));
-        assert_eq!(parse_dec_or_hex("0x1234"), Some(0x1234));
-        assert_eq!(parse_dec_or_hex("0xABcd"), Some(0xABcd));
-
-        assert_eq!(parse_dec_or_hex("65536"), None);
-        assert_eq!(parse_dec_or_hex("0x65536"), None);
-
-        assert_eq!(parse_dec_or_hex(""), None);
-        assert_eq!(parse_dec_or_hex("0x"), None);
-    }
-
-    // reverse DNS tests
+    // === Helper function tests ===
 
     #[test]
     fn reverse_ipv4() {
@@ -1177,20 +980,42 @@ mod test {
     }
 
     #[test]
-    fn reverse_flag_ipv4() {
-        let options = Options::getopts(&["-x", "8.8.8.8"]).unwrap();
-        assert_eq!(
-            options.requests.inputs.domains,
-            vec![Labels::encode("8.8.8.8.in-addr.arpa").unwrap()]
-        );
-        assert_eq!(options.requests.inputs.record_types, vec![RecordType::PTR]);
+    fn parse_txid_decimal() {
+        assert_eq!(parse_txid("1234"), Ok(1234));
     }
 
     #[test]
-    fn reverse_flag_invalid_ip() {
-        assert_eq!(
-            Options::getopts(&["-x", "not-an-ip"]),
-            OptionsResult::InvalidOptions(OptionsError::InvalidIPAddress("not-an-ip".into()))
-        );
+    fn parse_txid_hex() {
+        assert_eq!(parse_txid("0x1234"), Ok(0x1234));
+    }
+
+    #[test]
+    fn parse_class_in() {
+        assert_eq!(parse_class("IN"), Ok(QClass::IN));
+    }
+
+    #[test]
+    fn parse_class_ch() {
+        assert_eq!(parse_class("CH"), Ok(QClass::CH));
+    }
+
+    #[test]
+    fn parse_class_hs() {
+        assert_eq!(parse_class("HS"), Ok(QClass::HS));
+    }
+
+    #[test]
+    fn parse_class_number() {
+        assert_eq!(parse_class("4"), Ok(QClass::Other(4)));
+    }
+
+    #[test]
+    fn constant_name_detection() {
+        assert!(is_constant_name("MX"));
+        assert!(is_constant_name("AAAA"));
+        assert!(is_constant_name("A"));
+        assert!(!is_constant_name("example.com"));
+        assert!(!is_constant_name("123"));
+        assert!(!is_constant_name(""));
     }
 }

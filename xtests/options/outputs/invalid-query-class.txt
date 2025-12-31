@@ -1,1 +1,3 @@
-dog: Invalid options: Invalid query class "XYZZY"
+error: invalid value 'XYZZY' for '--class <CLASS>': Invalid class: XYZZY
+
+For more information, try '--help'.

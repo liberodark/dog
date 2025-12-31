@@ -47,52 +47,27 @@ fn main() {
         warn!("Failed to enable ANSI support: {}", e);
     }
 
-    match Options::getopts(env::args_os().skip(1)) {
+    match Options::parse() {
         OptionsResult::Ok(options) => {
             info!("Running with options -> {options:#?}");
             disabled_feature_check(&options);
             exit(run(options));
         }
 
-        OptionsResult::Help(help_reason, use_colours) => {
+        OptionsResult::Help(use_colours) => {
+            // Show a simple message for NoDomains case
             if use_colours.should_use_colours() {
-                print!(
-                    "{}",
-                    include_str!(concat!(env!("OUT_DIR"), "/usage.pretty.txt"))
-                );
+                eprintln!("\x1b[1mdog\x1b[0m: No domains to look up!");
             } else {
-                print!(
-                    "{}",
-                    include_str!(concat!(env!("OUT_DIR"), "/usage.bland.txt"))
-                );
+                eprintln!("dog: No domains to look up!");
             }
-
-            if help_reason == HelpReason::NoDomains {
-                exit(exits::OPTIONS_ERROR);
-            } else {
-                exit(exits::SUCCESS);
-            }
-        }
-
-        OptionsResult::Version(use_colours) => {
-            if use_colours.should_use_colours() {
-                print!(
-                    "{}",
-                    include_str!(concat!(env!("OUT_DIR"), "/version.pretty.txt"))
-                );
-            } else {
-                print!(
-                    "{}",
-                    include_str!(concat!(env!("OUT_DIR"), "/version.bland.txt"))
-                );
-            }
-
-            exit(exits::SUCCESS);
-        }
-
-        OptionsResult::InvalidOptionsFormat(oe) => {
-            eprintln!("dog: Invalid options: {oe}");
+            eprintln!("Run 'dog --help' for usage information.");
             exit(exits::OPTIONS_ERROR);
+        }
+
+        OptionsResult::Exit(code) => {
+            // Completions were printed
+            exit(code);
         }
 
         OptionsResult::InvalidOptions(why) => {

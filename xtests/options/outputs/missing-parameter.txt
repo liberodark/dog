@@ -1,1 +1,3 @@
-dog: Invalid options: Argument to option 'class' missing
+error: a value is required for '--class <CLASS>' but none was supplied
+
+For more information, try '--help'.
