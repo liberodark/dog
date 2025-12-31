@@ -41,6 +41,7 @@ Register-ArgumentCompleter -Native -CommandName 'dog' -ScriptBlock {
         '^(-t|--type)'        { $isOptionValue = $true; $completions += $dnsTypeValues }
         '^(-n|--nameserver)'  { $isOptionValue = $true }
         '^(--class)'          { $isOptionValue = $true; $completions += @('IN', 'CH', 'HS') }
+        '^(-x|--reverse)'     { $isOptionValue = $true }
         '^(--edns)'           { $isOptionValue = $true; $completions += @('disable', 'hide', 'show') }
         '^(--txid)'           { $isOptionValue = $true }
         '^(-Z)'               { $isOptionValue = $true; $completions += @('aa', 'ad', 'bufsize=', 'cd') }
@@ -64,6 +65,7 @@ Register-ArgumentCompleter -Native -CommandName 'dog' -ScriptBlock {
             '-t', '--type',
             '-n', '--nameserver',
             '--class',
+            '-x', '--reverse',
             '--edns',
             '--txid',
             '-Z',

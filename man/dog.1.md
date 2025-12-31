@@ -38,6 +38,9 @@ EXAMPLES
 `dog -q example.net -t MX -n 1.1.1.1 -T`
 : As above, but using explicit arguments
 
+`dog -x 8.8.8.8`
+: Perform a reverse DNS lookup for an IP address
+
 
 QUERY OPTIONS
 =============
@@ -53,6 +56,9 @@ QUERY OPTIONS
 
 `--class=CLASS`
 : Network class of the DNS record being queried (`IN`, `CH`, `HS`)
+
+`-x`, `--reverse=ADDR`
+: Perform a reverse DNS lookup for an IP address. This converts the IP address to a PTR query (e.g., `8.8.8.8` becomes `8.8.8.8.in-addr.arpa`). Both IPv4 and IPv6 addresses are supported.
 
 By default, dog will request A records using the system default resolver. At least one domain name must be passed — dog will not automatically query the root nameservers.
 

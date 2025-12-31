@@ -8,6 +8,7 @@ __dog() {
         {-t,--type}"[Type of the DNS record being queried]:(record type):(A AAAA CAA CNAME HINFO MX NS PTR SOA SRV TXT)" \
         {-n,--nameserver}"[Address of the nameserver to send packets to]::_hosts;" \
         --class"[Network class of the DNS record being queried]:(network class):(IN CH HS)" \
+        {-x,--reverse}"[Perform a reverse DNS lookup for an IP address]" \
         --edns"[Whether to OPT in to EDNS]:(edns setting):(disable hide show)" \
         --txid"[Set the transaction ID to a specific value]" \
         -Z"[Configure uncommon protocol-level tweaks]:(protocol tweak):(aa ad bufsize= cd)" \

@@ -8,6 +8,7 @@ complete -c dog -s 'q' -l 'query'      -d "Host name or domain name to query" -x
 complete -c dog -s 't' -l 'type'       -d "Type of the DNS record being queried" -x -a "A AAAA CAA CNAME HINFO MX NS PTR SOA SRV TXT"
 complete -c dog -s 'n' -l 'nameserver' -d "Address of the nameserver to send packets to" -x -a "(__fish_print_hostnames)"
 complete -c dog        -l 'class'      -d "Network class of the DNS record being queried" -x -a "IN CH HS"
+complete -c dog -s 'x' -l 'reverse'    -d "Perform a reverse DNS lookup for an IP address" -x
 
 # Sending options
 complete -c dog        -l 'edns'       -d "Whether to OPT in to EDNS" -x -a "

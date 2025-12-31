@@ -63,6 +63,12 @@ impl Options {
             "Network class of the DNS record being queried (IN, CH, HS)",
             "CLASS",
         );
+        opts.optmulti(
+            "x",
+            "reverse",
+            "Perform a reverse DNS lookup for an IP address",
+            "ADDR",
+        );
 
         // Sending options
         opts.optopt(
@@ -219,6 +225,13 @@ impl Inputs {
             }
         }
 
+        // Handle reverse lookups (-x)
+        for ip in matches.opt_strs("reverse") {
+            let ptr_name = ip_to_reverse_name(&ip).ok_or(OptionsError::InvalidIPAddress(ip))?;
+            self.add_domain(&ptr_name)?;
+            self.add_type(RecordType::PTR);
+        }
+
         Ok(())
     }
 
@@ -319,6 +332,35 @@ fn parse_class_name(input: &str) -> Option<QClass> {
         Some(QClass::HS)
     } else {
         None
+    }
+}
+
+/// Converts an IP address to its reverse DNS name (PTR format).
+///
+/// - IPv4: `8.8.8.8` → `8.8.8.8.in-addr.arpa`
+/// - IPv6: `2001:4860:4860::8888` → `8.8.8.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.0.6.8.4.1.0.0.2.ip6.arpa`
+fn ip_to_reverse_name(ip: &str) -> Option<String> {
+    use std::net::IpAddr;
+
+    let addr: IpAddr = ip.parse().ok()?;
+
+    match addr {
+        IpAddr::V4(ipv4) => {
+            let octets = ipv4.octets();
+            Some(format!(
+                "{}.{}.{}.{}.in-addr.arpa",
+                octets[3], octets[2], octets[1], octets[0]
+            ))
+        }
+        IpAddr::V6(ipv6) => {
+            let mut nibbles = String::with_capacity(72);
+            for byte in ipv6.octets().iter().rev() {
+                use std::fmt::Write;
+                let _ = write!(nibbles, "{:x}.{:x}.", byte & 0xf, byte >> 4);
+            }
+            nibbles.push_str("ip6.arpa");
+            Some(nibbles)
+        }
     }
 }
 
@@ -485,6 +527,7 @@ pub enum HelpReason {
 pub enum OptionsError {
     InvalidDomain(String),
     InvalidEDNS(String),
+    InvalidIPAddress(String),
     InvalidQueryType(String),
     InvalidQueryClass(String),
     InvalidTxid(String),
@@ -498,6 +541,7 @@ impl fmt::Display for OptionsError {
         match self {
             Self::InvalidDomain(domain) => write!(f, "Invalid domain {domain:?}"),
             Self::InvalidEDNS(edns) => write!(f, "Invalid EDNS setting {edns:?}"),
+            Self::InvalidIPAddress(ip) => write!(f, "Invalid IP address {ip:?}"),
             Self::InvalidQueryType(qt) => write!(f, "Invalid query type {qt:?}"),
             Self::InvalidQueryClass(qc) => write!(f, "Invalid query class {qc:?}"),
             Self::InvalidTxid(txid) => write!(f, "Invalid transaction ID {txid:?}"),
@@ -1096,5 +1140,57 @@ mod test {
 
         assert_eq!(parse_dec_or_hex(""), None);
         assert_eq!(parse_dec_or_hex("0x"), None);
+    }
+
+    // reverse DNS tests
+
+    #[test]
+    fn reverse_ipv4() {
+        assert_eq!(
+            ip_to_reverse_name("8.8.8.8"),
+            Some("8.8.8.8.in-addr.arpa".to_string())
+        );
+    }
+
+    #[test]
+    fn reverse_ipv4_different() {
+        assert_eq!(
+            ip_to_reverse_name("192.168.1.1"),
+            Some("1.1.168.192.in-addr.arpa".to_string())
+        );
+    }
+
+    #[test]
+    fn reverse_ipv6() {
+        assert_eq!(
+            ip_to_reverse_name("2001:4860:4860::8888"),
+            Some(
+                "8.8.8.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.0.6.8.4.1.0.0.2.ip6.arpa"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn reverse_invalid() {
+        assert_eq!(ip_to_reverse_name("not-an-ip"), None);
+    }
+
+    #[test]
+    fn reverse_flag_ipv4() {
+        let options = Options::getopts(&["-x", "8.8.8.8"]).unwrap();
+        assert_eq!(
+            options.requests.inputs.domains,
+            vec![Labels::encode("8.8.8.8.in-addr.arpa").unwrap()]
+        );
+        assert_eq!(options.requests.inputs.record_types, vec![RecordType::PTR]);
+    }
+
+    #[test]
+    fn reverse_flag_invalid_ip() {
+        assert_eq!(
+            Options::getopts(&["-x", "not-an-ip"]),
+            OptionsResult::InvalidOptions(OptionsError::InvalidIPAddress("not-an-ip".into()))
+        );
     }
 }
