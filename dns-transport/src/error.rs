@@ -24,6 +24,7 @@ pub enum Error {
     #[cfg(feature = "with_rustls")]
     RustlsInvalidDnsNameError,
 
+    /// There was a problem with the TLS connection using rustls
     #[cfg(feature = "with_rustls")]
     RustlsError(rustls::Error),
 
@@ -35,6 +36,10 @@ pub enum Error {
     /// response code text, if present.
     #[cfg(feature = "with_https")]
     WrongHttpStatus(u16, Option<String>),
+
+    /// The HTTPS URL is invalid (must start with https://)
+    #[cfg(feature = "with_https")]
+    InvalidHttpsUrl,
 }
 
 // From impls

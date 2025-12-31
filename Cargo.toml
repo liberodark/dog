@@ -64,7 +64,7 @@ ipconfig = { version = "0.3" }
 pretty_assertions = "1.4"
 
 [features]
-default = ["with_idna", "with_tls", "with_https", "with_nativetls"]
+default = ["with_idna", "with_tls", "with_https", "with_rustls"]
 with_idna = ["dns/with_idna"]
 with_tls = ["dns-transport/with_tls"]
 with_https = ["dns-transport/with_https"]

@@ -18,8 +18,16 @@ fn stream_rustls(
     use rustls::pki_types::ServerName;
     use std::sync::Arc;
 
-    let root_store =
-        rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let mut root_store = rustls::RootCertStore::empty();
+
+    let native_certs = rustls_native_certs::load_native_certs();
+    for cert in native_certs.certs {
+        let _ = root_store.add(cert);
+    }
+
+    if root_store.is_empty() {
+        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    }
 
     let config = rustls::ClientConfig::builder()
         .with_root_certificates(root_store)

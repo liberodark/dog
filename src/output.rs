@@ -663,7 +663,9 @@ fn erroneous_phase(error: &TransportError) -> &'static str {
         #[cfg(feature = "with_rustls")]
         TransportError::RustlsError(_) => "tls",
         #[cfg(feature = "with_https")]
-        TransportError::HttpError(_) | TransportError::WrongHttpStatus(_, _) => "http",
+        TransportError::HttpError(_)
+        | TransportError::WrongHttpStatus(_, _)
+        | TransportError::InvalidHttpsUrl => "http",
     }
 }
 
@@ -689,6 +691,10 @@ fn error_message(error: TransportError) -> String {
             t,
             r.unwrap_or_else(|| "No reason".into())
         ),
+        #[cfg(feature = "with_https")]
+        TransportError::InvalidHttpsUrl => {
+            "Invalid HTTPS nameserver URL (must be https://...)".into()
+        }
     }
 }
 

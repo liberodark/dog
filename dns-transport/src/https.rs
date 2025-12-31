@@ -38,7 +38,7 @@ use tls_stream::TlsStream;
 impl Transport for HttpsTransport {
     #[cfg(feature = "with_https")]
     fn send(&self, request: &Request) -> Result<Response, Error> {
-        let (domain, path) = self.split_domain().expect("Invalid HTTPS nameserver");
+        let (domain, path) = self.split_domain().ok_or(Error::InvalidHttpsUrl)?;
 
         info!("Opening TLS socket to {domain:?}");
         let mut stream = Self::stream(domain, 443)?;
